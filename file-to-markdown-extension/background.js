@@ -96,37 +96,65 @@ chrome.runtime.onConnect.addListener((port) => {
   const pendingMessages = [];
   let offscreenPort = null;
   let ready = false;
+  let isCreatingOffscreen = false;
 
   // Synchronously listen for messages to prevent dropped messages during async offscreen creation
   port.onMessage.addListener((message) => {
     if (ready && offscreenPort) {
-      offscreenPort.postMessage(message);
+      try {
+        offscreenPort.postMessage(message);
+      } catch (err) {
+        console.error('[FTM] Failed to forward message to offscreen:', err.message);
+        port.postMessage({ type: 'ERROR', data: { error: 'Offscreen communication failed' } });
+      }
     } else {
       pendingMessages.push(message);
     }
   });
 
+  // Mark as creating to prevent duplicate calls
+  isCreatingOffscreen = true;
+  
   createOffscreen().then(() => {
+    isCreatingOffscreen = false;
     offscreenPort = chrome.runtime.connect({ name: 'ftm-offscreen-internal' });
 
     offscreenPort.onMessage.addListener((message) => {
-      port.postMessage(message);
+      try {
+        port.postMessage(message);
+      } catch (err) {
+        console.error('[FTM] Failed to forward message to content:', err.message);
+      }
     });
 
     port.onDisconnect.addListener(() => {
       try { offscreenPort.disconnect(); } catch (_) {}
+      offscreenPort = null;
     });
+    
     offscreenPort.onDisconnect.addListener(() => {
       try { port.disconnect(); } catch (_) {}
+      offscreenPort = null;
+      ready = false;
     });
 
     ready = true;
+    // Flush buffered messages
     while (pendingMessages.length > 0) {
-      offscreenPort.postMessage(pendingMessages.shift());
+      const msg = pendingMessages.shift();
+      try {
+        offscreenPort.postMessage(msg);
+      } catch (err) {
+        console.error('[FTM] Failed to send buffered message:', err.message);
+        port.postMessage({ type: 'ERROR', data: { error: 'Buffered message failed' } });
+      }
     }
 
   }).catch((err) => {
+    isCreatingOffscreen = false;
+    console.error('[FTM] Offscreen creation failed:', err.message);
     port.postMessage({ type: 'ERROR', data: { error: err.message } });
+    try { port.disconnect(); } catch (_) {}
   });
 });
 

@@ -23,15 +23,32 @@
   'use strict';
 
   // ---------------------------------------------------------------------------
-  // 1. DYNAMIC SCRIPT LOADING
+  // 1. DYNAMIC SCRIPT LOADING WITH ERROR HANDLING
   // ---------------------------------------------------------------------------
 
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = src;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load script: ' + src));
+      
+      let timeoutId = null;
+      
+      script.onload = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        resolve();
+      };
+      
+      script.onerror = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        console.error('[FTM] Failed to load script:', src);
+        reject(new Error('Library load failed: ' + src));
+      };
+      
+      // Add timeout to prevent hanging on slow/blocked loads
+      timeoutId = setTimeout(() => {
+        script.onerror(new Error('Load timeout: ' + src));
+      }, 15000);
+      
       document.head.appendChild(script);
     });
   }
@@ -287,11 +304,26 @@
       throw new Error('PDF.js library not loaded.');
     }
 
-    // Set worker source to the local file
-    pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.min.js');
+    // Set worker source to the local file using absolute URL
+    const workerUrl = new URL('lib/pdf.worker.min.js', chrome.runtime.getURL('/')).href;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-    const pdf = await loadingTask.promise;
+    // Validate ArrayBuffer is not empty
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+      throw new Error('The PDF file is empty, i.e. its size is zero bytes.');
+    }
+
+    // Wrap ArrayBuffer in Uint8Array for PDF.js
+    const typedArray = new Uint8Array(arrayBuffer);
+
+    let pdf;
+    try {
+      const loadingTask = pdfjsLib.getDocument({ data: typedArray });
+      pdf = await loadingTask.promise;
+    } catch (err) {
+      throw new Error('Failed to load PDF: ' + (err.message || 'Unknown error'));
+    }
+
     const numPages = pdf.numPages;
 
     let markdown = '# ' + fileName.replace(/\.[^.]+$/, '') + '\n\n';
@@ -303,15 +335,31 @@
         markdown += `**Page ${pageNum}**\n\n`;
       }
 
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
+      let page;
+      let textContent;
+      try {
+        page = await pdf.getPage(pageNum);
+        textContent = await page.getTextContent();
+      } catch (err) {
+        console.warn('[FTM] PDF page ' + pageNum + ' extraction error:', err.message);
+        markdown += `*[Page ${pageNum} could not be extracted]*\n\n`;
+        continue;
+      }
 
       // Sort text items top-to-bottom (Y desc), left-to-right (X asc)
-      const items = textContent.items.map(item => ({
-        str: item.str,
-        x: item.transform[4],
-        y: Math.round(item.transform[5])
-      }));
+      // FIX: Validate transform matrix exists before accessing
+      const items = textContent.items
+        .filter(item => item && item.str && item.str.trim())
+        .map(item => {
+          const tr = Array.isArray(item.transform) && item.transform.length >= 6
+            ? item.transform
+            : [1, 0, 0, 1, 0, 0];
+          return {
+            str: item.str,
+            x: tr[4],
+            y: Math.round(tr[5])
+          };
+        });
 
       items.sort((a, b) => {
         if (Math.abs(a.y - b.y) > 3) return b.y - a.y;
@@ -494,31 +542,47 @@
 
     switch (extension) {
       case '.docx':
-        await loadScript('lib/mammoth.browser.min.js');
-        await loadScript('lib/turndown.min.js');
+        if (typeof mammoth === 'undefined') {
+          await loadScript('lib/mammoth.browser.min.js');
+        }
+        if (typeof TurndownService === 'undefined') {
+          await loadScript('lib/turndown.min.js');
+        }
         markdown = await processDocx(arrayBuffer, fileName);
         break;
 
       case '.xlsx':
       case '.xls':
-        await loadScript('lib/xlsx.mini.min.js');
+        if (typeof XLSX === 'undefined') {
+          await loadScript('lib/xlsx.mini.min.js');
+        }
         markdown = await processSpreadsheet(arrayBuffer, fileName);
         break;
 
       case '.epub':
-        await loadScript('lib/jszip.min.js');
-        await loadScript('lib/turndown.min.js');
+        if (typeof JSZip === 'undefined') {
+          await loadScript('lib/jszip.min.js');
+        }
+        if (typeof TurndownService === 'undefined') {
+          await loadScript('lib/turndown.min.js');
+        }
         markdown = await processEpub(arrayBuffer, fileName);
         break;
 
       case '.pptx':
-        await loadScript('lib/jszip.min.js');
-        await loadScript('lib/turndown.min.js');
+        if (typeof JSZip === 'undefined') {
+          await loadScript('lib/jszip.min.js');
+        }
+        if (typeof TurndownService === 'undefined') {
+          await loadScript('lib/turndown.min.js');
+        }
         markdown = await processPptx(arrayBuffer, fileName);
         break;
 
       case '.pdf':
-        await loadScript('lib/pdf.min.js');
+        if (typeof pdfjsLib === 'undefined') {
+          await loadScript('lib/pdf.min.js');
+        }
         markdown = await processPdf(arrayBuffer, fileName);
         break;
 

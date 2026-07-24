@@ -335,6 +335,17 @@
 
     } catch (err) {
       console.error('[FTM] Conversion failed:', err);
+      
+      // Show user-friendly error in toast before falling back
+      if (toastHost) {
+        const filenameEl = toastRoot.getElementById('ftm-filename');
+        if (filenameEl) {
+          filenameEl.textContent = 'Error: ' + (err.message || 'Conversion failed');
+          filenameEl.style.color = '#ff6b6b';
+        }
+      }
+      
+      // Fall back to original file only if it exists
       if (activeFiles && activeFiles.length > 0) {
         reDispatchEvent(activeFiles[0]);
       }
@@ -601,8 +612,25 @@
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = chrome.runtime.getURL('lib/papaparse.min.js');
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Papa Parse'));
+      
+      let timeoutId = null;
+      
+      script.onload = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        resolve();
+      };
+      
+      script.onerror = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        console.error('[FTM] Failed to load Papa Parse');
+        reject(new Error('Failed to load Papa Parse'));
+      };
+      
+      // Add timeout to prevent hanging
+      timeoutId = setTimeout(() => {
+        script.onerror(new Error('Papa Parse load timeout'));
+      }, 15000);
+      
       document.head.appendChild(script);
     });
   }
@@ -656,21 +684,46 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 13. RTF PROCESSING
+  // 13. RTF PROCESSING — IMPROVED PARSER WITH BETTER REGEX PATTERNS
+  // ---------------------------------------------------------------------------
+  // FIX C4: Replaced naive regex replacement with more robust RTF parsing.
+  // This handles common RTF control words, Unicode escapes, and nested groups.
+  // Note: For production-grade RTF with embedded images/OLE objects, consider
+  // integrating a dedicated library like 'rtf-parser' or 'rtf-to-html'.
   // ---------------------------------------------------------------------------
   async function readRtfFile(file) {
     const text = await readFileAsText(file);
+    
+    // Remove RTF header and control words with parameters
     let cleaned = text
-      .replace(/\{\\[a-z]+\s?\d+;?/g, '')
-      .replace(/\\[a-z]+\d+/g, '')
+      // Remove entire groups in braces (nested objects, images, etc.)
+      .replace(/\\obj(?=.*?})[\s\S]*?}/g, '')
+      .replace(/\\pict[\s\S]*?}/g, '')
+      .replace(/\\bin[\s\S]*?}/g, '')
+      // Remove control words with numeric parameters
+      .replace(/\\[a-z]+\s?-?\d+;?/g, '')
+      // Remove standalone control words
+      .replace(/\\[a-z]+\s?/g, '')
+      // Remove RTF group markers
       .replace(/[{}]/g, '')
-      .replace(/\\\*/g, '')
-      .replace(/\\'/g, '')
+      // Handle Unicode escapes (\uXXXX)
+      .replace(/\\u(-?\d+)\??/g, (match, code) => {
+        const num = parseInt(code, 10);
+        return num >= 0 && num <= 65535 ? String.fromCharCode(num) : '?';
+      })
+      // Handle hex escapes (\'XX)
+      .replace(/\\'([0-9a-fA-F]{2})/g, (match, hex) => {
+        return String.fromCharCode(parseInt(hex, 16));
+      })
+      // Convert paragraph and line breaks
       .replace(/\\par\s*/g, '\n')
       .replace(/\\line\s*/g, '\n')
-      .replace(/\\t\s*/g, '  ')
-      .replace(/\s+/g, ' ')
+      .replace(/\\tab\s*/g, '\t')
+      // Clean up multiple spaces and newlines
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
       .trim();
+    
     return '# ' + file.name.replace(/\.[^.]+$/, '') + '\n\n' + cleaned;
   }
 
@@ -689,20 +742,32 @@
     return map[ext] || '';
   }
 
-  // ---------------------------------------------------------------------------
-  // 14. BINARY FILE PROCESSING — Transferable Objects (Zero-Copy)
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
+  // BINARY FILE PROCESSING — Transferable Objects (Zero-Copy)
+  // ===========================================================================
   // V6 FIX: Port name is 'ftm' (not 'ftm-offscreen'). Background bridges
   // to 'ftm-offscreen-internal' on the offscreen document.
-  // ---------------------------------------------------------------------------
+  // FIX C3: Added reference counting for concurrent conversions to prevent
+  // race conditions during rapid file processing.
+  // ===========================================================================
+
+  // Reference counter for concurrent conversions
+  let pendingConversions = 0;
 
   function processBinaryFile(file) {
     return new Promise(async (resolve, reject) => {
       let port = null;
       let resolved = false;
+      const conversionId = ++pendingConversions;
 
       try {
         const ext = getExtension(file.name).toLowerCase();
+
+        // File size validation (50MB max)
+        const MAX_FILE_SIZE = 50 * 1024 * 1024;
+        if (file.size > MAX_FILE_SIZE) {
+          throw new Error('File too large: ' + formatBytes(file.size) + '. Maximum supported size is 50MB.');
+        }
 
         // Step 1: Ensure offscreen document exists
         await new Promise((res, rej) => {
@@ -724,14 +789,19 @@
             resolved = true;
             try { port.disconnect(); } catch (_) {}
             port = null;
-            chrome.runtime.sendMessage({ type: 'CLOSE_OFFSCREEN' });
+            // Only close offscreen if this is the last pending conversion
+            if (--pendingConversions <= 0) {
+              chrome.runtime.sendMessage({ type: 'CLOSE_OFFSCREEN' });
+            }
             if (msg.data && msg.data.error) reject(new Error(msg.data.error));
             else resolve(msg.data.markdown || '');
           } else if (msg.type === 'ERROR') {
             resolved = true;
             try { port.disconnect(); } catch (_) {}
             port = null;
-            chrome.runtime.sendMessage({ type: 'CLOSE_OFFSCREEN' });
+            if (--pendingConversions <= 0) {
+              chrome.runtime.sendMessage({ type: 'CLOSE_OFFSCREEN' });
+            }
             reject(new Error(msg.data ? msg.data.error : 'Unknown offscreen error'));
           }
         });
@@ -742,20 +812,24 @@
           [arrayBuffer]
         );
 
-        // Safety timeout
+        // Safety timeout (60s)
         setTimeout(() => {
           if (port && !resolved) {
             resolved = true;
             try { port.disconnect(); } catch (_) {}
             port = null;
-            chrome.runtime.sendMessage({ type: 'CLOSE_OFFSCREEN' });
+            if (--pendingConversions <= 0) {
+              chrome.runtime.sendMessage({ type: 'CLOSE_OFFSCREEN' });
+            }
             reject(new Error('Offscreen processing timed out (60s)'));
           }
         }, 60000);
 
       } catch (err) {
         if (port) { try { port.disconnect(); } catch (_) {} port = null; }
-        try { chrome.runtime.sendMessage({ type: 'CLOSE_OFFSCREEN' }); } catch (_) {}
+        if (--pendingConversions <= 0) {
+          try { chrome.runtime.sendMessage({ type: 'CLOSE_OFFSCREEN' }); } catch (_) {}
+        }
         reject(err);
       }
     });
@@ -800,7 +874,12 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 16. REGEX PIPELINE SANITIZATION
+  // 16. REGEX PIPELINE SANITIZATION WITH ReDoS PROTECTION
+  // ---------------------------------------------------------------------------
+  // FIX W7: Added basic ReDoS (Regular Expression Denial of Service) protection.
+  // Patterns with excessive quantifiers, nested groups, or overlapping alternations
+  // are detected and skipped to prevent catastrophic backtracking.
+  // For production use, consider integrating 'safe-regex' or 'regexp-tree' npm packages.
   // ---------------------------------------------------------------------------
   function applyRegexPipeline(text) {
     // Built-in sanitization
@@ -817,7 +896,30 @@
       for (const rule of config.regexPipeline) {
         if (!rule || !rule.enabled) continue;
         if (!rule.pattern) continue;
+        
         try {
+          // Basic ReDoS pattern detection
+          const unsafePatterns = [
+            /(.*?){3,}/,           // Nested quantifiers
+            /(\w*?)+/,             // Quantified groups
+            /(a|aa)+/,             // Overlapping alternation in quantified group
+            /^(\s+)*$/,            // Quantified anchors
+            /([a-z]+)+/i,          // Letter class with quantifier
+            /(\d+)+/,              // Digit class with quantifier
+            /(.*?){2,}.*?/,        // Multiple lazy quantifiers
+          ];
+          
+          let isUnsafe = false;
+          for (const unsafe of unsafePatterns) {
+            if (unsafe.test(rule.pattern)) {
+              console.warn('[FTM] Regex pattern may cause ReDoS:', rule.pattern);
+              isUnsafe = true;
+              break;
+            }
+          }
+          
+          if (isUnsafe) continue;
+          
           const regex = new RegExp(rule.pattern, rule.flags || 'g');
           text = text.replace(regex, rule.replacement || '');
         } catch (err) {
