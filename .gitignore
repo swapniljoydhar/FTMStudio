@@ -2,24 +2,37 @@
 # Dependencies
 node_modules/
 
-# Build artifacts
-dist/
-build/
-*.min.js
-*.bundle.js
-
-# Logs and temp files
-*.log
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
 *.tmp
+
+# Logs
+*.log
 
 # Environment
 .env
 .env.local
 *.env.*
 
-# Editors
-.vscode/
-.idea/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+.env
+
+# Build outputs
+dist/
+build/
+target/
+*.min.js
+*.min.css
 
 # OS generated files
 .DS_Store

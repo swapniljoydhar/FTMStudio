@@ -304,9 +304,8 @@
       throw new Error('PDF.js library not loaded.');
     }
 
-    // Set worker source to the local file using absolute URL
-    const workerUrl = new URL('lib/pdf.worker.min.js', chrome.runtime.getURL('/')).href;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+    // Set worker source using correct Chrome extension URL format
+    pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.min.js');
 
     // Validate ArrayBuffer is not empty
     if (!arrayBuffer || arrayBuffer.byteLength === 0) {
@@ -321,6 +320,7 @@
       const loadingTask = pdfjsLib.getDocument({ data: typedArray });
       pdf = await loadingTask.promise;
     } catch (err) {
+      console.error('[FTM] PDF.js getDocument error:', err);
       throw new Error('Failed to load PDF: ' + (err.message || 'Unknown error'));
     }
 
