@@ -69,11 +69,8 @@
     '.txt', '.md', '.py', '.js', '.cpp', '.css', '.json', '.xml', '.html', '.csv'
   ]);
 
-  // Binary files processed in offscreen document
-  const BINARY_EXTENSIONS = new Set(['.docx', '.xlsx', '.xls', '.epub', '.pptx']);
-
-  // Files processed in offscreen but as text (not binary)
-  const OFFSCREEN_TEXT_EXTENSIONS = new Set(['.pdf']);
+  // Binary files processed in offscreen document (includes PDF)
+  const BINARY_EXTENSIONS = new Set(['.docx', '.xlsx', '.xls', '.epub', '.pptx', '.pdf']);
 
   const RTF_EXTENSION = new Set(['.rtf']);
 
@@ -210,33 +207,52 @@
       :host { all: initial; display: block; }
       *, *::before, *::after { box-sizing: border-box; }
       .ftm-toast {
-        font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
-        width: 360px;
-        background: rgba(10, 11, 16, 0.88);
-        backdrop-filter: blur(24px) saturate(1.8);
-        -webkit-backdrop-filter: blur(24px) saturate(1.8);
-        border: 1px solid rgba(0, 210, 255, 0.22);
-        border-radius: 16px;
-        padding: 20px;
-        color: #f0f2f8;
-        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05) inset, 0 0 24px rgba(0, 210, 255, 0.12);
+        font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+        width: 340px;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 16px;
+        color: #111827;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
         user-select: none;
       }
-      .ftm-toast-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-      .ftm-icon { width: 22px; height: 22px; color: #00d2ff; flex-shrink: 0; filter: drop-shadow(0 0 6px rgba(0,210,255,0.4)); }
-      .ftm-toast-title { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; color: #ffffff; }
-      .ftm-toast-body { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-      .ftm-toast-filename { font-size: 13px; font-weight: 500; color: #a0a5ba; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); }
-      .ftm-toast-hint { font-size: 11px; color: #646a82; display: flex; align-items: center; gap: 6px; }
-      .ftm-toast-progress { height: 4px; background: rgba(255, 255, 255, 0.08); border-radius: 2px; overflow: hidden; position: relative; margin-bottom: 16px; }
-      .ftm-toast-progress-bar { height: 100%; width: 100%; background: linear-gradient(90deg, #00d2ff, #3b82f6); border-radius: 2px; transition: width 0.1s linear; transform-origin: left; }
-      .ftm-toast-timer { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 10px; color: #00d2ff; font-weight: 700; }
-      .ftm-toast-actions { display: flex; gap: 10px; justify-content: flex-end; }
-      .ftm-btn { font-family: inherit; font-size: 13px; font-weight: 600; padding: 8px 18px; border-radius: 10px; border: none; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); outline: none; }
-      .ftm-btn-approve { background: linear-gradient(135deg, #00d2ff 0%, #0077b6 100%); color: #ffffff; box-shadow: 0 4px 14px rgba(0, 210, 255, 0.35); }
-      .ftm-btn-approve:hover { box-shadow: 0 6px 20px rgba(0, 210, 255, 0.5); transform: translateY(-1px); }
-      .ftm-btn-deny { background: rgba(255, 255, 255, 0.06); color: #a0a5ba; border: 1px solid rgba(255, 255, 255, 0.09); }
-      .ftm-btn-deny:hover { background: rgba(255, 255, 255, 0.12); color: #ffffff; }
+      @media (prefers-color-scheme: dark) {
+        .ftm-toast {
+          background: #1e293b;
+          border-color: #334155;
+          color: #f1f5f9;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+        }
+      }
+      .ftm-toast-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+      .ftm-icon { width: 20px; height: 20px; color: #2563eb; flex-shrink: 0; }
+      .ftm-toast-title { font-size: 14px; font-weight: 600; color: #111827; }
+      @media (prefers-color-scheme: dark) {
+        .ftm-toast-title { color: #f1f5f9; }
+      }
+      .ftm-toast-body { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+      .ftm-toast-filename { font-size: 12px; font-weight: 500; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f9fafb; padding: 6px 10px; border-radius: 6px; border: 1px solid #e5e7eb; }
+      @media (prefers-color-scheme: dark) {
+        .ftm-toast-filename { background: #0f172a; border-color: #334155; color: #94a3b8; }
+      }
+      .ftm-toast-hint { font-size: 10px; color: #9ca3af; display: flex; align-items: center; gap: 6px; }
+      .ftm-toast-progress { height: 3px; background: #e5e7eb; border-radius: 2px; overflow: hidden; position: relative; margin-bottom: 14px; }
+      @media (prefers-color-scheme: dark) {
+        .ftm-toast-progress { background: #334155; }
+      }
+      .ftm-toast-progress-bar { height: 100%; width: 100%; background: #2563eb; border-radius: 2px; transition: width 0.1s linear; transform-origin: left; }
+      .ftm-toast-timer { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 9px; color: #2563eb; font-weight: 600; }
+      .ftm-toast-actions { display: flex; gap: 8px; justify-content: flex-end; }
+      .ftm-btn { font-family: inherit; font-size: 12px; font-weight: 500; padding: 7px 14px; border-radius: 6px; border: none; cursor: pointer; transition: all 0.15s; outline: none; }
+      .ftm-btn-approve { background: #2563eb; color: #ffffff; }
+      .ftm-btn-approve:hover { background: #1d4ed8; }
+      .ftm-btn-deny { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
+      .ftm-btn-deny:hover { background: #e5e7eb; }
+      @media (prefers-color-scheme: dark) {
+        .ftm-btn-deny { background: #334155; color: #e2e8f0; border-color: #475569; }
+        .ftm-btn-deny:hover { background: #475569; }
+      }
     `;
   }
 
@@ -303,9 +319,8 @@
       let markdownText;
 
       if (BINARY_EXTENSIONS.has(ext)) {
+        // All binary files including PDF go through the offscreen binary pipeline
         markdownText = await processBinaryFile(file);
-      } else if (OFFSCREEN_TEXT_EXTENSIONS.has(ext)) {
-        markdownText = await processPdfFile(file);
       } else if (ext === '.csv') {
         markdownText = await processCsvFile(file);
       } else if (RTF_EXTENSION.has(ext)) {
@@ -525,19 +540,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 11. PDF PROCESSING (PDF.js — lazy-loaded in offscreen)
-  // ---------------------------------------------------------------------------
-  // PDF files are routed to the offscreen document for processing.
-  // The offscreen dynamically loads PDF.js, extracts text from each page,
-  // and formats it as structured Markdown.
-  // ---------------------------------------------------------------------------
-
-  function processPdfFile(file) {
-    return processBinaryFile(file);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 12. TRUE CSV STREAMING (Papa Parse streaming API)
+  // 11. CSV STREAMING (Papa Parse streaming API)
   // ---------------------------------------------------------------------------
 
   async function processCsvFile(file) {
