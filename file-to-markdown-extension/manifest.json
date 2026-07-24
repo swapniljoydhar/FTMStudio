@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "File to Markdown Converter",
+  "version": "6.5.0",
+  "description": "Automatically detects and intercepts file uploads, converting documents to high-fidelity Markdown. All processing happens 100% locally.",
+  "permissions": [
+    "storage",
+    "offscreen",
+    "downloads"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "lib/mammoth.browser.min.js",
+        "lib/xlsx.mini.min.js",
+        "lib/jszip.min.js",
+        "lib/turndown.min.js",
+        "lib/papaparse.min.js",
+        "lib/pdf.min.js",
+        "lib/pdf.worker.min.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ]
+}
