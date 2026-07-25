@@ -191,24 +191,78 @@ document.addEventListener('DOMContentLoaded', async () => {
       const div = document.createElement('div');
       div.className = 'regex-rule';
 
-      div.innerHTML = `
-        <div class="regex-rule-header">
-          <span class="regex-rule-title">Rule ${idx + 1}</span>
-          <div style="display:flex;align-items:center;gap:6px">
-            <label class="mini-toggle">
-              <input type="checkbox" class="regex-enabled" data-idx="${idx}" ${rule.enabled ? 'checked' : ''}>
-              <span class="mini-track"><span class="mini-thumb"></span></span>
-            </label>
-            <button class="btn-remove" data-idx="${idx}" title="Remove rule">&times;</button>
-          </div>
-        </div>
-        <input type="text" class="regex-pattern" data-idx="${idx}" placeholder="Pattern (e.g. https?://\\S+)" value="${escapeAttr(rule.pattern)}">
-        <div class="regex-rule-row">
-          <input type="text" class="regex-replacement" data-idx="${idx}" placeholder="Replacement" value="${escapeAttr(rule.replacement || '')}">
-          <input type="text" class="regex-flags" data-idx="${idx}" placeholder="Flags" value="${escapeAttr(rule.flags || 'g')}" style="width:45px;text-align:center">
-        </div>
-      `;
-
+      // Create header
+      const header = document.createElement('div');
+      header.className = 'regex-rule-header';
+      
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'regex-rule-title';
+      titleSpan.textContent = 'Rule ' + (idx + 1);
+      
+      const actionsDiv = document.createElement('div');
+      actionsDiv.style.cssText = 'display:flex;align-items:center;gap:6px';
+      
+      // Toggle label
+      const toggleLabel = document.createElement('label');
+      toggleLabel.className = 'mini-toggle';
+      const toggleInput = document.createElement('input');
+      toggleInput.type = 'checkbox';
+      toggleInput.className = 'regex-enabled';
+      toggleInput.dataset.idx = idx;
+      toggleInput.checked = rule.enabled !== false;
+      const toggleTrack = document.createElement('span');
+      toggleTrack.className = 'mini-track';
+      const toggleThumb = document.createElement('span');
+      toggleThumb.className = 'mini-thumb';
+      toggleTrack.appendChild(toggleThumb);
+      toggleLabel.appendChild(toggleInput);
+      toggleLabel.appendChild(toggleTrack);
+      
+      // Remove button
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn-remove';
+      removeBtn.dataset.idx = idx;
+      removeBtn.setAttribute('title', 'Remove rule');
+      removeBtn.textContent = '×';
+      
+      actionsDiv.appendChild(toggleLabel);
+      actionsDiv.appendChild(removeBtn);
+      header.appendChild(titleSpan);
+      header.appendChild(actionsDiv);
+      
+      // Pattern input
+      const patternInput = document.createElement('input');
+      patternInput.type = 'text';
+      patternInput.className = 'regex-pattern';
+      patternInput.dataset.idx = idx;
+      patternInput.placeholder = 'Pattern (e.g. https?://\\S+)';
+      patternInput.value = rule.pattern || '';
+      
+      // Rule row
+      const ruleRow = document.createElement('div');
+      ruleRow.className = 'regex-rule-row';
+      
+      const replacementInput = document.createElement('input');
+      replacementInput.type = 'text';
+      replacementInput.className = 'regex-replacement';
+      replacementInput.dataset.idx = idx;
+      replacementInput.placeholder = 'Replacement';
+      replacementInput.value = rule.replacement || '';
+      
+      const flagsInput = document.createElement('input');
+      flagsInput.type = 'text';
+      flagsInput.className = 'regex-flags';
+      flagsInput.dataset.idx = idx;
+      flagsInput.placeholder = 'Flags';
+      flagsInput.value = rule.flags || 'g';
+      flagsInput.style.cssText = 'width:45px;text-align:center';
+      
+      ruleRow.appendChild(replacementInput);
+      ruleRow.appendChild(flagsInput);
+      
+      div.appendChild(header);
+      div.appendChild(patternInput);
+      div.appendChild(ruleRow);
       regexContainer.appendChild(div);
     });
 
@@ -288,13 +342,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       const item = history[i];
       const time = new Date(item.timestamp);
       const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      html += `
-        <div class="history-item">
-          <span class="history-file">${escapeHtml(item.file || '')}</span>
-          <span class="history-ext">${(item.extension || '').toUpperCase().replace('.', '')}</span>
-          <span class="history-time">${timeStr}</span>
-        </div>
-      `;
+      
+      // Create history item using DOM methods instead of template literal
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'history-item';
+      
+      const fileSpan = document.createElement('span');
+      fileSpan.className = 'history-file';
+      fileSpan.textContent = item.file || '';
+      
+      const extSpan = document.createElement('span');
+      extSpan.className = 'history-ext';
+      extSpan.textContent = (item.extension || '').toUpperCase().replace('.', '');
+      
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'history-time';
+      timeSpan.textContent = timeStr;
+      
+      itemDiv.appendChild(fileSpan);
+      itemDiv.appendChild(extSpan);
+      itemDiv.appendChild(timeSpan);
+      
+      html += itemDiv.outerHTML;
     }
     historyList.innerHTML = html;
   }

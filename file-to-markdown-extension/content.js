@@ -181,40 +181,99 @@
 
     const container = document.createElement('div');
     container.className = 'ftm-toast';
-    container.innerHTML = `
-      <div class="ftm-toast-inner">
-        <div class="ftm-toast-header">
-          <svg class="ftm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-            <polyline points="10 9 9 9 8 9"/>
-          </svg>
-          <span class="ftm-toast-title">Convert to Markdown?</span>
-        </div>
-        <div class="ftm-toast-body">
-          <span class="ftm-toast-filename" id="ftm-filename"></span>
-          <span class="ftm-toast-hint">Enter = convert · Esc = skip</span>
-        </div>
-        <div class="ftm-toast-progress">
-          <div class="ftm-toast-progress-bar" id="ftm-progress-bar"></div>
-          <span class="ftm-toast-timer" id="ftm-timer"></span>
-        </div>
-        <div class="ftm-toast-actions">
-          <button class="ftm-btn ftm-btn-approve" id="ftm-approve">Convert</button>
-          <button class="ftm-btn ftm-btn-deny" id="ftm-deny">Skip</button>
-        </div>
-      </div>
-    `;
+    
+    // Create header with SVG icon
+    const header = document.createElement('div');
+    header.className = 'ftm-toast-header';
+    
+    const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    iconSvg.setAttribute('class', 'ftm-icon');
+    iconSvg.setAttribute('viewBox', '0 0 24 24');
+    iconSvg.setAttribute('fill', 'none');
+    iconSvg.setAttribute('stroke', 'currentColor');
+    iconSvg.setAttribute('stroke-width', '2');
+    
+    const iconPaths = [
+      ['path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }],
+      ['polyline', { points: '14 2 14 8 20 8' }],
+      ['line', { x1: '16', y1: '13', x2: '8', y2: '13' }],
+      ['line', { x1: '16', y1: '17', x2: '8', y2: '17' }],
+      ['polyline', { points: '10 9 9 9 8 9' }]
+    ];
+    
+    iconPaths.forEach(([tag, attrs]) => {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      for (const [key, value] of Object.entries(attrs)) {
+        el.setAttribute(key, value);
+      }
+      iconSvg.appendChild(el);
+    });
+    
+    const title = document.createElement('span');
+    title.className = 'ftm-toast-title';
+    title.textContent = 'Convert to Markdown?';
+    
+    header.appendChild(iconSvg);
+    header.appendChild(title);
+    
+    // Create body
+    const body = document.createElement('div');
+    body.className = 'ftm-toast-body';
+    
+    const filename = document.createElement('span');
+    filename.className = 'ftm-toast-filename';
+    filename.id = 'ftm-filename';
+    
+    const hint = document.createElement('span');
+    hint.className = 'ftm-toast-hint';
+    hint.textContent = 'Enter = convert · Esc = skip';
+    
+    body.appendChild(filename);
+    body.appendChild(hint);
+    
+    // Create progress bar
+    const progress = document.createElement('div');
+    progress.className = 'ftm-toast-progress';
+    
+    const progressBar = document.createElement('div');
+    progressBar.className = 'ftm-toast-progress-bar';
+    progressBar.id = 'ftm-progress-bar';
+    
+    const timer = document.createElement('span');
+    timer.className = 'ftm-toast-timer';
+    timer.id = 'ftm-timer';
+    
+    progress.appendChild(progressBar);
+    progress.appendChild(timer);
+    
+    // Create actions
+    const actions = document.createElement('div');
+    actions.className = 'ftm-toast-actions';
+    
+    const approveBtn = document.createElement('button');
+    approveBtn.className = 'ftm-btn ftm-btn-approve';
+    approveBtn.id = 'ftm-approve';
+    approveBtn.textContent = 'Convert';
+    
+    const denyBtn = document.createElement('button');
+    denyBtn.className = 'ftm-btn ftm-btn-deny';
+    denyBtn.id = 'ftm-deny';
+    denyBtn.textContent = 'Skip';
+    
+    actions.appendChild(approveBtn);
+    actions.appendChild(denyBtn);
+    
+    // Assemble container
+    container.appendChild(header);
+    container.appendChild(body);
+    container.appendChild(progress);
+    container.appendChild(actions);
     toastRoot.appendChild(container);
 
     void toastHost.offsetHeight;
     toastHost.style.opacity = '1';
     toastHost.style.transform = 'translateX(0)';
 
-    const approveBtn = toastRoot.getElementById('ftm-approve');
-    const denyBtn = toastRoot.getElementById('ftm-deny');
     if (approveBtn) approveBtn.addEventListener('click', () => onApprove());
     if (denyBtn) denyBtn.addEventListener('click', () => onDeny());
   }
