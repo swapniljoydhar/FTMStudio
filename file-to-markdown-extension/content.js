@@ -21,12 +21,29 @@
 (() => {
   'use strict';
 
+  // ===========================================================================
+  // CONSTANTS — Centralized configuration values
+  // ===========================================================================
+  const CONSTANTS = {
+    SNIFF_THRESHOLD_BYTES: 1024,
+    MAX_TEXT_READ_SIZE_BYTES: 10 * 1024 * 1024,
+    MAX_FILE_SIZE_BYTES: 50 * 1024 * 1024,
+    CSV_STREAM_THRESHOLD_MB_DEFAULT: 5,
+    MAX_CSV_ROWS: 100000,
+    SCRIPT_LOAD_TIMEOUT_MS: 15000,
+    CONVERSION_TIMEOUT_MS: 60000,
+    TOAST_COUNTDOWN_DEFAULT_SEC: 10,
+    MAX_HISTORY_ENTRIES: 50,
+    KB: 1024,
+    MB: 1024 * 1024
+  };
+
   // ---------------------------------------------------------------------------
   // 1. CONFIGURATION — loaded from chrome.storage.local
   // ---------------------------------------------------------------------------
   let config = {
     enabled: true,
-    autoDismissSeconds: 10,
+    autoDismissSeconds: CONSTANTS.TOAST_COUNTDOWN_DEFAULT_SEC,
     domainBlacklist: [],
     categories: {
       documents: true,
@@ -37,12 +54,12 @@
       presentations: true
     },
     yamlFrontmatter: true,
-    csvStreamThreshold: 5,
+    csvStreamThreshold: CONSTANTS.CSV_STREAM_THRESHOLD_MB_DEFAULT,
     stripTrailingWhitespace: true,
     enforceHeadingHierarchy: false,
     regexPipeline: [],
     conversionHistory: [],
-    maxConversions: 50
+    maxConversions: CONSTANTS.MAX_HISTORY_ENTRIES
   };
 
   const EXTENSION_MAP = {
@@ -497,13 +514,12 @@
     const fileName = file.name;
 
     // Skip content sniffing for tiny files (< 1KB) — overhead not worth it
-    if (file.size > 1024) {
+    if (file.size > CONSTANTS.SNIFF_THRESHOLD_BYTES) {
       try {
         await sniffFileContent(file);
       } catch (err) {
         console.warn('[FTM]', err.message);
-        const MAX_TEXT_READ_SIZE = 10 * 1024 * 1024;
-        if (file.size > MAX_TEXT_READ_SIZE) {
+        if (file.size > CONSTANTS.MAX_TEXT_READ_SIZE_BYTES) {
           throw new Error(
             `File "${fileName}" appears binary and is too large (${formatBytes(file.size)}) to safely read as text.`
           );
@@ -544,7 +560,7 @@
   // ---------------------------------------------------------------------------
 
   async function processCsvFile(file) {
-    const threshold = (config.csvStreamThreshold || 5) * 1024 * 1024;
+    const threshold = (config.csvStreamThreshold || CONSTANTS.CSV_STREAM_THRESHOLD_MB_DEFAULT) * CONSTANTS.MB;
 
     if (file.size < threshold) {
       const text = await readFileAsText(file);
@@ -572,7 +588,7 @@
           for (let i = 0; i < data.length; i++) {
             const row = data[i];
             if (!row || (row.length === 1 && row[0] === '')) continue;
-            if (rowCount >= 100000) return;
+            if (rowCount >= CONSTANTS.MAX_CSV_ROWS) return;
 
             const cells = row.map(c => {
               const val = String(c !== null && c !== undefined ? c : '').replace(/\|/g, '\\|');
@@ -594,7 +610,7 @@
             rowCount++;
           }
 
-          if (rowCount >= 100000) {
+          if (rowCount >= CONSTANTS.MAX_CSV_ROWS) {
             results.abort();
           }
         },
@@ -632,7 +648,7 @@
       // Add timeout to prevent hanging
       timeoutId = setTimeout(() => {
         script.onerror(new Error('Papa Parse load timeout'));
-      }, 15000);
+      }, CONSTANTS.SCRIPT_LOAD_TIMEOUT_MS);
       
       document.head.appendChild(script);
     });
@@ -731,9 +747,9 @@
   }
 
   function formatBytes(bytes) {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    if (bytes < CONSTANTS.KB) return bytes + ' B';
+    if (bytes < CONSTANTS.MB) return (bytes / CONSTANTS.KB).toFixed(1) + ' KB';
+    return (bytes / CONSTANTS.MB).toFixed(1) + ' MB';
   }
 
   function getLanguageTag(ext) {
@@ -767,8 +783,7 @@
         const ext = getExtension(file.name).toLowerCase();
 
         // File size validation (50MB max)
-        const MAX_FILE_SIZE = 50 * 1024 * 1024;
-        if (file.size > MAX_FILE_SIZE) {
+        if (file.size > CONSTANTS.MAX_FILE_SIZE_BYTES) {
           throw new Error('File too large: ' + formatBytes(file.size) + '. Maximum supported size is 50MB.');
         }
 
@@ -826,7 +841,7 @@
             }
             reject(new Error('Offscreen processing timed out (60s)'));
           }
-        }, 60000);
+        }, CONSTANTS.CONVERSION_TIMEOUT_MS);
 
       } catch (err) {
         if (port) { try { port.disconnect(); } catch (_) {} port = null; }
