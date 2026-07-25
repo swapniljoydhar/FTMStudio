@@ -1,4 +1,3 @@
-```
 # Compiled and binary files
 *.pyc
 *.class
@@ -22,6 +21,16 @@ target/
 .mypy_cache/
 .pytest_cache/
 
+# Build artifacts
+dist/
+build/
+*.min.js
+*.bundle.js
+
+# Logs and temp files
+*.log
+*.tmp
+
 # Editors/IDE
 .vscode/
 .idea/
@@ -34,10 +43,6 @@ Thumbs.db
 .env
 .env.local
 *.env.*
-
-# Logs and temp files
-*.log
-*.tmp
 
 # Coverage
 coverage/
@@ -67,4 +72,3 @@ htmlcov/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-```

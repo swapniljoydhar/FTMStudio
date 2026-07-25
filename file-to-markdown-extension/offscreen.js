@@ -26,10 +26,28 @@
   // 1. DYNAMIC SCRIPT LOADING WITH ERROR HANDLING
   // ---------------------------------------------------------------------------
 
+  // SRI Hashes for library integrity verification
+  const SRI_HASHES = {
+    'lib/mammoth.browser.min.js': 'sha256-596ef52239e52d8ee3cee10b2ee4a72596abf900d0e4f468593f956e9f1809b0',
+    'lib/xlsx.mini.min.js': 'sha256-3120abba1fd0ea031f25ab22ac93e726f6f63467da1a6349b82e82f3df5d775c',
+    'lib/jszip.min.js': 'sha256-acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e',
+    'lib/turndown.min.js': 'sha256-fd0e2aa0785c13c39fa1ddc0b3b19520e541b69801c1369ea4aabfe7913a0dea',
+    'lib/pdf.min.js': 'sha256-5b5799e6f8c680663207ac5b42ee14eed2a406fa7af48f50c154f0c0b1566946',
+    'lib/pdf.worker.min.js': 'sha256-feabdf309770ed24bba31a5467836cdc8cf639c705af27d52b585b041bb8527b',
+    'lib/papaparse.min.js': 'sha256-b8e870c5d2b29772f10c9fa9a693c8b896aac8540ed6701e3cc6304c683febdb'
+  };
+
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = src;
+      
+      // Add Subresource Integrity hash if available
+      const sriHash = SRI_HASHES[src];
+      if (sriHash) {
+        script.integrity = sriHash;
+        script.crossOrigin = 'anonymous';
+      }
       
       let timeoutId = null;
       
