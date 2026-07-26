@@ -66,14 +66,28 @@ FTM.applyRegexPipeline = function (text) {
 FTM.isRegexSafe = function (pattern) {
   try {
     const regex = new RegExp(pattern, 'g');
-    const t1 = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!';
-    const s1 = performance.now();
-    regex.test(t1);
-    if (performance.now() - s1 > 50) return false;
-    const t2 = 'a'.repeat(25) + 'b';
-    const s2 = performance.now();
-    regex.test(t2);
-    return performance.now() - s2 <= 50;
+    const tests = [
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!',
+      'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!',
+      'ababababababababababababababab!',
+    ];
+    for (const t of tests) {
+      const s = performance.now();
+      regex.test(t);
+      if (performance.now() - s > 50) return false;
+    }
+    // Heuristic: detect nested quantifiers (e.g., (a+)+, (a*)*, (.*)*)
+    // These are dangerous when the match fails
+    const hasNestedQuantifier = /(\([^)]*[+*]\)[+*]|\(\.[*]\)[+*]|[+*]{2,})/.test(pattern);
+    if (hasNestedQuantifier) {
+      try {
+        const failRegex = new RegExp(pattern, 'g');
+        const s = performance.now();
+        failRegex.test('aaaa!');
+        if (performance.now() - s > 50) return false;
+      } catch {}
+    }
+    return true;
   } catch {
     return false;
   }

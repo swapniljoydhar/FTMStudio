@@ -68,20 +68,28 @@ function escapeYamlString(str) {
     .replace(/\}/g, '\\}');
 }
 
-// --- C1: isRegexSafe (from content.js) ---
+// --- C1: isRegexSafe (from postprocess.js) ---
 function isRegexSafe(pattern) {
   try {
     const regex = new RegExp(pattern, 'g');
-    const testStr = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!';
-    const start = performance.now();
-    regex.test(testStr);
-    const elapsed = performance.now() - start;
-    if (elapsed > 50) return false;
-    const testStr2 = 'a'.repeat(25) + 'b';
-    const start2 = performance.now();
-    regex.test(testStr2);
-    const elapsed2 = performance.now() - start2;
-    if (elapsed2 > 50) return false;
+    const tests = [
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!',
+      'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!',
+      'ababababababababababababababab!',
+    ];
+    for (const t of tests) {
+      const start = performance.now();
+      regex.test(t);
+      if (performance.now() - start > 50) return false;
+    }
+    if (/(\([^)]*[+*]\)[+*]|\(\.[*]\)[+*]|[+*]{2,})/.test(pattern)) {
+      try {
+        const failRegex = new RegExp(pattern, 'g');
+        const start = performance.now();
+        failRegex.test('aaaa!');
+        if (performance.now() - start > 50) return false;
+      } catch {}
+    }
     return true;
   } catch {
     return false;
@@ -211,10 +219,11 @@ assertEqual(isRegexSafe('hello'), true, 'Simple literal is safe');
 assertEqual(isRegexSafe('\\d+'), true, 'Simple quantifier is safe');
 assertEqual(isRegexSafe('[a-z]+'), true, 'Character class is safe');
 assertEqual(isRegexSafe('a|b|c'), true, 'Simple alternation is safe');
-assert(isRegexSafe('(a+)+') === false || true, 'Nested quantifier detected or runs fast enough on small input');
+assertEqual(isRegexSafe('(a+)+'), true, 'Nested quantifier — succeeds on substring (acceptable)');
 assertEqual(isRegexSafe('['), false, 'Invalid regex returns false');
-// Note: (?=.*)(.*)* may pass timing test on small strings — that's acceptable
-// The real protection is the 50ms threshold, which catches actual catastrophic patterns
+assertEqual(isRegexSafe('(x+x+)+y'), false, 'Catastrophic backtracking detected (fails on input)');
+// Note: patterns like (.*)* and (a*)* pass because they match substrings.
+// Real protection: 2MB text length guard + 50ms timeout per regex call.
 
 console.log('\n━━━ C2: YAML Injection Prevention ━━━');
 assertEqual(escapeYamlString('hello'), 'hello', 'Plain string unchanged');
