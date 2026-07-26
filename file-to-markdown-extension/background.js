@@ -246,8 +246,10 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 
 const DEFAULT_CONFIG = {
   enabled: true,
+  smartMode: true,
   autoDismissSeconds: 10,
   domainBlacklist: [],
+  domainWhitelist: [],
   categories: {
     documents: true,
     pdf: true,

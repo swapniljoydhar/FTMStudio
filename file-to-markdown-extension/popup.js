@@ -6,8 +6,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentConfig = {};
   const DEFAULT_CONFIG = {
     enabled: true,
+    smartMode: true,
     autoDismissSeconds: 10,
     domainBlacklist: [],
+    domainWhitelist: [],
     categories: { pdf: true, documents: true, spreadsheets: true, code: true, markup: true, presentations: true },
     yamlFrontmatter: true,
     csvStreamThreshold: 5,
@@ -21,6 +23,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── DOM refs ──
   const $ = (id) => document.getElementById(id);
   const masterToggle = $('master-toggle');
+  const smartModeToggle = $('smart-mode');
+  const whitelistSection = $('whitelist-section');
+  const whitelistTextarea = $('whitelist-textarea');
+  const aiSitesList = $('ai-sites-list');
   const statusDot = $('status-dot');
   const statusLabel = $('status-label');
   const timerSlider = $('timer-slider');
@@ -57,6 +63,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
+  // ── AI Sites list (display only) ──
+  const AI_HOSTS = ['chat.openai.com', 'chatgpt.com', 'claude.ai', 'gemini.google.com', 'bard.google.com', 'copilot.microsoft.com', 'chat.mistral.ai', 'huggingface.co', 'poe.com', 'perplexity.ai', 'you.com', 'chat.deepseek.com', 'kimi.moonshot.cn', 'tongyi.aliyun.com', 'chatglm.cn', 'doubao.com'];
+  AI_HOSTS.forEach(host => {
+    const pill = document.createElement('span');
+    pill.className = 'pill';
+    pill.textContent = host;
+    aiSitesList.appendChild(pill);
+  });
+
+  function updateSmartModeUI() {
+    const smart = smartModeToggle.checked;
+    whitelistSection.classList.toggle('hidden', !smart);
+  }
+
+  smartModeToggle.addEventListener('change', () => {
+    currentConfig.smartMode = smartModeToggle.checked;
+    saveConfig({ smartMode: currentConfig.smartMode });
+    updateSmartModeUI();
+  });
+
+  whitelistTextarea.addEventListener('change', () => {
+    const domains = whitelistTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
+    currentConfig.domainWhitelist = domains;
+    saveConfig({ domainWhitelist: domains });
+  });
+
   // ── Config ──
   const categoryCheckboxes = ['pdf', 'documents', 'spreadsheets', 'code', 'markup', 'presentations'];
 
@@ -80,12 +112,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Populate UI ──
   function populateUI() {
     masterToggle.checked = currentConfig.enabled !== false;
+    smartModeToggle.checked = currentConfig.smartMode !== false;
+    updateSmartModeUI();
     updateStatus();
 
     timerSlider.value = currentConfig.autoDismissSeconds || 10;
     timerValue.textContent = (currentConfig.autoDismissSeconds || 10) + 's';
 
     blacklistTextarea.value = (currentConfig.domainBlacklist || []).join('\n');
+    whitelistTextarea.value = (currentConfig.domainWhitelist || []).join('\n');
     yamlToggle.checked = currentConfig.yamlFrontmatter !== false;
 
     csvSlider.value = currentConfig.csvStreamThreshold || 5;

@@ -39,3 +39,23 @@ FTM.MAGIC_SIGNATURES = [
   { bytes: [0x1F, 0x8B], name: 'GZIP' },
   { bytes: [0x42, 0x5A, 0x68], name: 'BZIP2' },
 ];
+
+// AI/LLM platforms where Smart Mode activates automatically
+FTM.AI_HOSTS = [
+  'chat.openai.com',
+  'chatgpt.com',
+  'claude.ai',
+  'gemini.google.com',
+  'bard.google.com',
+  'copilot.microsoft.com',
+  'chat.mistral.ai',
+  'huggingface.co',
+  'poe.com',
+  'perplexity.ai',
+  'you.com',
+  'chat.deepseek.com',
+  'kimi.moonshot.cn',
+  'tongyi.aliyun.com',
+  'chatglm.cn',
+  'doubao.com',
+];

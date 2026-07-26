@@ -107,7 +107,7 @@ function enforceHeadingHierarchy(text) {
   });
 }
 
-// --- H2: isBlacklisted (from content.js) ---
+// --- H2: isBlacklisted (from utils.js) ---
 function isBlacklisted(hostname, domainBlacklist) {
   hostname = hostname.toLowerCase();
   if (!domainBlacklist || domainBlacklist.length === 0) return false;
@@ -115,6 +115,27 @@ function isBlacklisted(hostname, domainBlacklist) {
     const trimmed = domain.trim().toLowerCase();
     if (!trimmed) continue;
     if (hostname === trimmed || hostname.endsWith('.' + trimmed)) return true;
+  }
+  return false;
+}
+
+// --- Smart Mode: shouldActivate ---
+const AI_HOSTS = ['chat.openai.com', 'chatgpt.com', 'claude.ai', 'gemini.google.com', 'copilot.microsoft.com', 'chat.deepseek.com'];
+
+function shouldActivate(hostname, config) {
+  hostname = hostname.toLowerCase();
+  if (isBlacklisted(hostname, config.domainBlacklist)) return false;
+  if (!config.smartMode) return true;
+  // Check user whitelist
+  const wl = config.domainWhitelist || [];
+  for (const d of wl) {
+    const t = d.trim().toLowerCase();
+    if (!t) continue;
+    if (hostname === t || hostname.endsWith('.' + t)) return true;
+  }
+  // Check AI hosts
+  for (const ai of AI_HOSTS) {
+    if (hostname === ai || hostname.endsWith('.' + ai)) return true;
   }
   return false;
 }
@@ -285,6 +306,29 @@ console.log('\n━━━ Sanitize Rules (popup.js) ━━━');
   assertEqual(result[1].enabled, false, 'Disabled preserved');
   assertEqual(result[2].replacement, '', 'Undefined replacement becomes empty');
   assertEqual(result[2].flags, 'g', 'Undefined flags defaults to g');
+}
+
+console.log('\n━━━ Smart Mode: shouldActivate ━━━');
+{
+  const cfgSmart = { smartMode: true, domainBlacklist: [], domainWhitelist: ['my-app.com'] };
+  const cfgDumb = { smartMode: false, domainBlacklist: [], domainWhitelist: [] };
+  const cfgBlacklist = { smartMode: true, domainBlacklist: ['blocked.com'], domainWhitelist: ['blocked.com'] };
+
+  assertEqual(shouldActivate('chat.openai.com', cfgSmart), true, 'Smart: ChatGPT activates');
+  assertEqual(shouldActivate('claude.ai', cfgSmart), true, 'Smart: Claude activates');
+  assertEqual(shouldActivate('sub.claude.ai', cfgSmart), true, 'Smart: subdomain of AI site activates');
+  assertEqual(shouldActivate('gemini.google.com', cfgSmart), true, 'Smart: Gemini activates');
+  assertEqual(shouldActivate('my-app.com', cfgSmart), true, 'Smart: whitelisted site activates');
+  assertEqual(shouldActivate('sub.my-app.com', cfgSmart), true, 'Smart: subdomain of whitelisted activates');
+  assertEqual(shouldActivate('facebook.com', cfgSmart), false, 'Smart: non-AI site skipped');
+  assertEqual(shouldActivate('gmail.com', cfgSmart), false, 'Smart: email site skipped');
+  assertEqual(shouldActivate('bank.com', cfgSmart), false, 'Smart: banking site skipped');
+
+  assertEqual(shouldActivate('facebook.com', cfgDumb), true, 'Dumb mode: any site activates');
+  assertEqual(shouldActivate('gmail.com', cfgDumb), true, 'Dumb mode: email activates');
+
+  assertEqual(shouldActivate('blocked.com', cfgBlacklist), false, 'Blacklist overrides whitelist + AI');
+  assertEqual(shouldActivate('chat.openai.com', cfgBlacklist), true, 'Blacklist: AI site still works');
 }
 
 console.log('\n━━━ Integration: sanitizeCsvCell + buildMarkdownTable ━━━');

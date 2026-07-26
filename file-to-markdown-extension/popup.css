@@ -377,7 +377,28 @@ textarea:focus { border-color: var(--accent); }
 
 .btn-remove:hover { color: var(--red); background: var(--accent-soft); }
 
-/* ── History ── */
+/* ── AI site pills ── */
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pill {
+  font-size: 10px;
+  font-weight: 450;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+/* ── Sections that show/hide based on Smart Mode ── */
+.section.hidden { display: none; }
+
+/* ── Empty state ── */
 .empty {
   display: flex;
   flex-direction: column;

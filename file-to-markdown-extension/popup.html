@@ -29,6 +29,23 @@
     <div class="panel active" id="panel-settings">
 
       <section class="section">
+        <label class="row">
+          <div>
+            <span class="row-label">Smart Mode</span>
+            <span class="row-sub">Only intercept on AI/chatbot sites</span>
+          </div>
+          <input type="checkbox" id="smart-mode" checked class="switch">
+        </label>
+      </section>
+
+      <section class="section" id="whitelist-section">
+        <h2 class="section-label">AI Sites (auto-detected)</h2>
+        <div class="pill-row" id="ai-sites-list"></div>
+        <h2 class="section-label" style="margin-top:8px">Additional Sites</h2>
+        <textarea id="whitelist-textarea" rows="2" placeholder="my-ai-app.com&#10;internal-tool.net"></textarea>
+      </section>
+
+      <section class="section">
         <h2 class="section-label">Timer</h2>
         <div class="row">
           <span class="row-label">Auto-dismiss</span>

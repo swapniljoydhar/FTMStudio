@@ -48,6 +48,39 @@ FTM.isBlacklisted = function () {
   return false;
 };
 
+/**
+ * Smart Mode activation check.
+ * - Smart Mode OFF: activate everywhere (unless blacklisted)
+ * - Smart Mode ON: only activate on AI sites + user-whitelisted sites
+ */
+FTM.shouldActivate = function () {
+  if (FTM.isBlacklisted()) return false;
+  if (!FTM.config.smartMode) return true;
+
+  try {
+    const hostname = window.location.hostname.toLowerCase();
+
+    // Check user whitelist
+    const wl = FTM.config.domainWhitelist;
+    if (wl && wl.length > 0) {
+      for (const domain of wl) {
+        const trimmed = domain.trim().toLowerCase();
+        if (!trimmed) continue;
+        if (hostname === trimmed || hostname.endsWith('.' + trimmed)) return true;
+      }
+    }
+
+    // Check built-in AI hosts
+    for (const ai of FTM.AI_HOSTS) {
+      if (hostname === ai || hostname.endsWith('.' + ai)) return true;
+    }
+
+    return false;
+  } catch (e) { /* cross-origin — default to activate */
+    return true;
+  }
+};
+
 FTM.shouldInterceptFile = function (file) {
   const ext = FTM.getExtension(file.name).toLowerCase();
   const category = FTM.EXTENSION_MAP[ext];

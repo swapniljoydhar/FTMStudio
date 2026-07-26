@@ -117,7 +117,7 @@ function reDispatchEvent(file) {
 // Event listeners
 // ---------------------------------------------------------------------------
 function handleDropCapture(event) {
-  if (!FTM.config.enabled || FTM.isBlacklisted() || isReDispatching) return;
+  if (!FTM.config.enabled || !FTM.shouldActivate() || isReDispatching) return;
   const dt = event.dataTransfer;
   if (!dt || !dt.files || dt.files.length === 0) return;
   const file = dt.files[0];
@@ -132,7 +132,7 @@ function handleDropCapture(event) {
 }
 
 function handleFileInputChange(event) {
-  if (!FTM.config.enabled || FTM.isBlacklisted() || isReDispatching) return;
+  if (!FTM.config.enabled || !FTM.shouldActivate() || isReDispatching) return;
   const input = event.target;
   if (!input || input.tagName !== 'INPUT' || input.type !== 'file') return;
   if (!input.files || input.files.length === 0) return;
