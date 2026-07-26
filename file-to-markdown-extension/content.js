@@ -126,7 +126,7 @@
   // ---------------------------------------------------------------------------
   function isBlacklisted() {
     try {
-      const hostname = window.location.hostname;
+      const hostname = window.location.hostname.toLowerCase();
       if (config.domainBlacklist && config.domainBlacklist.length > 0) {
         for (const domain of config.domainBlacklist) {
           const trimmed = domain.trim().toLowerCase();
@@ -1094,10 +1094,13 @@
       if (level < minLevel) minLevel = level;
     }
     if (minLevel === 1) return text;
-    const shift = minLevel - 1;
+    // Shift all headings so the deepest becomes h1
+    // e.g. if min is h3: h3->h1, h2->h4 (preserves relative order above min)
+    const shift = 1 - minLevel;
     return text.replace(/^(#{1,6})\s/gm, (match, hashes) => {
-      const newLevel = hashes.length - shift;
+      const newLevel = hashes.length + shift;
       if (newLevel < 1) return '# ';
+      if (newLevel > 6) return '#'.repeat(6) + ' ';
       return '#'.repeat(newLevel) + ' ';
     });
   }
@@ -1109,7 +1112,7 @@
       .map(r => ({
         pattern: r.pattern,
         replacement: typeof r.replacement === 'string' ? r.replacement : '',
-        flags: (r.flags || '').replace(/[^gimsuy]/g, ''),
+        flags: (r.flags || 'g').replace(/[^gimsuy]/g, '') || 'g',
         enabled: r.enabled !== false,
         name: typeof r.name === 'string' ? r.name : ''
       }));

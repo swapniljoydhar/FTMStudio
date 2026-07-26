@@ -172,7 +172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       .map(r => ({
         pattern: r.pattern,
         replacement: typeof r.replacement === 'string' ? r.replacement : '',
-        flags: (r.flags || '').replace(/[^gimsuy]/g, ''),
+        flags: (r.flags || 'g').replace(/[^gimsuy]/g, '') || 'g',
         enabled: r.enabled !== false,
         name: typeof r.name === 'string' ? r.name : ''
       }));
