@@ -5,6 +5,7 @@
 window.FTM = window.FTM || {};
 
 let isReDispatching = false;
+let isConverting = false; // Guard against concurrent approvals
 let activeFiles = null;
 let activeInputEl = null;
 let activeDropEvent = null;
@@ -20,15 +21,56 @@ function onKeydown(e) {
 }
 
 // ---------------------------------------------------------------------------
+// Show conversion error feedback
+// ---------------------------------------------------------------------------
+function showConversionError(fileName, errorMsg) {
+  try {
+    // Create a brief error toast
+    const host = document.createElement('div');
+    host.id = 'ftm-error-toast';
+    host.style.cssText = 'position:fixed;top:16px;right:16px;z-index:2147483647;pointer-events:auto;opacity:0;transition:opacity 0.3s;';
+    document.documentElement.appendChild(host);
+    const root = host.attachShadow({ mode: 'closed' });
+    root.innerHTML = `
+      <style>
+        .err { font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif; width: 300px; background: #fff; border: 1px solid #e8e8ec; border-radius: 10px; padding: 12px 14px; color: #1a1a1e; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+        @media (prefers-color-scheme: dark) { .err { background: #1a1a1e; border-color: #2a2a2e; color: #ededf0; box-shadow: 0 8px 32px rgba(0,0,0,0.4); } }
+        .err-title { font-size: 12px; font-weight: 600; color: #ff3b30; margin-bottom: 4px; }
+        .err-file { font-size: 11px; color: #6b6b76; font-family: 'SF Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+        .err-msg { font-size: 10px; color: #9d9da8; word-break: break-word; }
+        @media (prefers-color-scheme: dark) { .err-title { color: #ff453a; } .err-file { color: #8e8e9a; } .err-msg { color: #5c5c68; } }
+      </style>
+      <div class="err">
+        <div class="err-title">⚠ Conversion Failed</div>
+        <div class="err-file">${fileName}</div>
+        <div class="err-msg">${errorMsg}</div>
+      </div>
+    `;
+    void host.offsetHeight;
+    host.style.opacity = '1';
+    setTimeout(() => {
+      host.style.opacity = '0';
+      setTimeout(() => { if (host.parentNode) host.parentNode.removeChild(host); }, 400);
+    }, 4000);
+  } catch (_) { /* best effort */ }
+}
+
+// ---------------------------------------------------------------------------
 // Approve — convert and re-dispatch
 // ---------------------------------------------------------------------------
 FTM.onApprove = async function () {
-  if (!FTM.getToastHost() || !activeFiles) return;
+  if (!FTM.getToastHost() || !activeFiles || isConverting) return;
+  isConverting = true;
   if (FTM.getCountdownTimer()) { clearInterval(FTM.getCountdownTimer()); FTM.setCountdownTimer(null); }
   FTM.destroyToast();
 
   const file = activeFiles[0];
   const ext = FTM.getExtension(file.name).toLowerCase();
+
+  // Capture all re-dispatch state BEFORE any async work
+  const dropEvent = activeDropEvent;
+  const inputEl = activeInputEl;
+  const files = activeFiles;
 
   try {
     let md;
@@ -48,26 +90,30 @@ FTM.onApprove = async function () {
 
     const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
     const mdFile = new File([blob], file.name.replace(/\.[^.]+$/, '') + '.md', { type: 'text/markdown', lastModified: Date.now() });
-    reDispatchEvent(mdFile);
+    reDispatchEvent(mdFile, dropEvent, inputEl);
   } catch (err) {
     console.error('[FTM] Conversion failed:', err);
-    if (activeFiles.length > 0) reDispatchEvent(activeFiles[0]);
+    showConversionError(file.name, err.message || 'Unknown error');
+    if (files.length > 0) reDispatchEvent(files[0], dropEvent, inputEl);
+  } finally {
+    activeFiles = null;
+    activeInputEl = null;
+    activeDropEvent = null;
+    activeDataTransfer = null;
+    isConverting = false;
   }
-
-  activeFiles = null;
-  activeInputEl = null;
-  activeDropEvent = null;
-  activeDataTransfer = null;
 };
 
 // ---------------------------------------------------------------------------
 // Deny — pass original file through
 // ---------------------------------------------------------------------------
 FTM.onDeny = function () {
-  if (!FTM.getToastHost()) return;
+  if (!FTM.getToastHost() || isConverting) return;
   if (FTM.getCountdownTimer()) { clearInterval(FTM.getCountdownTimer()); FTM.setCountdownTimer(null); }
   FTM.destroyToast();
-  if (activeFiles && activeFiles.length > 0) reDispatchEvent(activeFiles[0]);
+  const dropEvent = activeDropEvent;
+  const inputEl = activeInputEl;
+  if (activeFiles && activeFiles.length > 0) reDispatchEvent(activeFiles[0], dropEvent, inputEl);
   activeFiles = null;
   activeInputEl = null;
   activeDropEvent = null;
@@ -77,36 +123,39 @@ FTM.onDeny = function () {
 // ---------------------------------------------------------------------------
 // Re-dispatch
 // ---------------------------------------------------------------------------
-function reDispatchEvent(file) {
+function reDispatchEvent(file, dropEvent, inputEl) {
+  if (!file) { console.warn('[FTM] reDispatchEvent: no file provided'); return; }
   isReDispatching = true;
   try {
-    if (activeDropEvent) {
+    if (dropEvent && dropEvent.target) {
       const dt = new DataTransfer();
       dt.items.add(file);
-      activeDropEvent.target.dispatchEvent(new DragEvent('drop', {
+      dropEvent.target.dispatchEvent(new DragEvent('drop', {
         bubbles: true, cancelable: true, composed: true,
-        clientX: activeDropEvent.clientX, clientY: activeDropEvent.clientY, dataTransfer: dt
+        clientX: dropEvent.clientX, clientY: dropEvent.clientY, dataTransfer: dt
       }));
-      activeDropEvent.target.dispatchEvent(new DragEvent('dragend', {
+      dropEvent.target.dispatchEvent(new DragEvent('dragend', {
         bubbles: true, cancelable: true, composed: true,
-        clientX: activeDropEvent.clientX, clientY: activeDropEvent.clientY
+        clientX: dropEvent.clientX, clientY: dropEvent.clientY
       }));
       return;
     }
-    if (activeInputEl) {
+    if (inputEl) {
       const dt = new DataTransfer();
       dt.items.add(file);
       try {
         const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'files')?.set;
-        if (set) set.call(activeInputEl, dt.files);
-        else activeInputEl.files = dt.files;
-      } catch (_) { activeInputEl.files = dt.files; }
+        if (set) set.call(inputEl, dt.files);
+        else inputEl.files = dt.files;
+      } catch (_) { inputEl.files = dt.files; }
       try {
         const valSet = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-        if (valSet) valSet.call(activeInputEl, 'C:\\fakepath\\' + file.name);
+        if (valSet) valSet.call(inputEl, 'C:\\fakepath\\' + file.name);
       } catch (_) {}
-      activeInputEl.dispatchEvent(new Event('change', { bubbles: true, cancelable: true, composed: true }));
-      activeInputEl.dispatchEvent(new Event('input', { bubbles: true, cancelable: true, composed: true }));
+      inputEl.dispatchEvent(new Event('change', { bubbles: true, cancelable: true, composed: true }));
+      inputEl.dispatchEvent(new Event('input', { bubbles: true, cancelable: true, composed: true }));
+    } else {
+      console.warn('[FTM] reDispatchEvent: no drop event or input element available');
     }
   } finally {
     setTimeout(() => { isReDispatching = false; }, 0);
@@ -163,6 +212,8 @@ function showPrompt(file) {
 // Cleanup
 // ---------------------------------------------------------------------------
 function cleanup() {
+  // Don't cleanup while conversion is in progress — state is captured locally
+  if (isConverting) return;
   if (FTM.getCountdownTimer()) { clearInterval(FTM.getCountdownTimer()); FTM.setCountdownTimer(null); }
   FTM.destroyToast();
   activeFiles = null;
