@@ -405,23 +405,20 @@
       }
       if (currentLine.trim()) lines.push(currentLine.trim());
 
+      // PDF heading detection — conservative approach
+      // PDF.js extracts raw text items. All structural information (font size,
+      // bold, heading styles) is lost. We can only guess based on layout.
+      // Strategy: only promote ALL-CAPS lines that look like section headers.
+      // Do NOT try to detect title-cased headings — too many false positives.
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         if (!line) continue;
 
-        // Conservative heading detection:
-        // 1. ALL-CAPS lines under 40 chars with letters (e.g. "INTRODUCTION", "CHAPTER 1")
-        // 2. Short lines (<40 chars) that are title-cased, don't end with punctuation,
-        //    AND are followed by a blank line or much longer line
-        const isAllCaps = line.length < 40 && line === line.toUpperCase() && /[A-Z]{2,}/.test(line) && !/\d/.test(line);
-        const nextLine = i + 1 < lines.length ? lines[i + 1] : '';
-        const isTitleLike = line.length < 40 && !line.endsWith('.') && !line.endsWith(',') &&
-          !line.endsWith(':') && !line.endsWith(';') &&
-          /^[A-Z]/.test(line) && (nextLine === '' || nextLine.length > line.length * 2);
+        const isAllCaps = line.length >= 3 && line.length <= 50 &&
+          line === line.toUpperCase() && /[A-Z]{3,}/.test(line) &&
+          !/^\d+$/.test(line) && !line.endsWith('.') && !line.endsWith(',');
 
         if (isAllCaps) {
-          markdown += '### ' + line + '\n\n';
-        } else if (isTitleLike) {
           markdown += '## ' + line + '\n\n';
         } else {
           markdown += line + '\n\n';
