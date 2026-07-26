@@ -1,5 +1,5 @@
 // ===========================================================================
-// offscreen.js — Ephemeral Binary File Parser (v7)
+// offscreen.js — Ephemeral Binary File Parser (v2.0)
 // ===========================================================================
 //
 // EXECUTES INSIDE THE OFFSCREEN DOCUMENT.
@@ -11,12 +11,12 @@
 //   - .pptx   (JSZip → slide XML → Markdown)
 //   - .pdf    (PDF.js → text extraction → structured Markdown)
 //
-// V7 CHANGES:
-//   - SRI hashes REMOVED (incompatible with chrome-extension:// scheme)
-//   - Turndown plugin-gfm added for proper GFM table/strikethrough support
-//   - Mammoth image stripping (no base64 bloat)
-//   - Graceful degradation when parsers fail
-//   - Aggressive cleanup on port disconnect AND message
+// CHANGES:
+//   - Added PDF.js for PDF text extraction
+//   - Added PPTX support via JSZip (reuse existing library)
+//   - Simplified port: listens ONLY for 'ftm-offscreen-internal'
+//   - Proper PDF.js worker path via web_accessible_resources
+//   - All libraries lazy-loaded on demand, aggressively nulled on close
 // ===========================================================================
 
 (() => {
@@ -35,12 +35,27 @@
   // V7 FIX: No SRI hashes — chrome-extension:// doesn't support crossOrigin
   // ---------------------------------------------------------------------------
 
+  // SRI Hashes for library integrity verification
+  const SRI_HASHES = {
+    'lib/mammoth.browser.min.js': 'sha256-WW71IjnlLY7jzuELLuSnJZar+QDQ5PRoWT+Vbp8YCbA=',
+    'lib/xlsx.mini.min.js': 'sha256-MSCruh/Q6gMfJasirJPnJvb2NGfaGmNJuC6C899dd1w=',
+    'lib/jszip.min.js': 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=',
+    'lib/turndown.min.js': 'sha256-/Q4qoHhcE8Ofod3As7GVIOVBtpgBwTaepKq/55E6Deo=',
+    'lib/pdf.min.js': 'sha256-W1eZ5vjGgGYyB6xbQu4U7tKkBvp69I9QwVTwwLFWaUY=',
+    'lib/pdf.worker.min.js': 'sha256-/qvfMJdw7SS7oxpUZ4Ns3Iz2OccFryfVK1hbBBu4Uns=',
+    'lib/papaparse.min.js': 'sha256-uOhwxdKyl3LxDJ+pppPIuJaqyFQO1nAePMYwTGg/69s='
+  };
+
   function loadScript(src) {
     return new Promise((resolve, reject) => {
-      // Check if already loaded
-      if (document.querySelector('script[src$="' + src + '"]')) {
-        resolve();
-        return;
+      const script = document.createElement('script');
+      script.src = chrome.runtime.getURL(src);
+      
+      // Add Subresource Integrity hash if available
+      const sriHash = SRI_HASHES[src];
+      if (sriHash) {
+        script.integrity = sriHash;
+        script.crossOrigin = 'anonymous';
       }
 
       const script = document.createElement('script');
@@ -84,10 +99,31 @@
       preformattedCode: true
     });
 
-    // V7: Official GFM plugin for tables + strikethrough + task lists
-    if (turndownPluginGfm && converter.use) {
-      converter.use(turndownPluginGfm.gfm);
-    }
+    // Table support rule — uses recursive turndown for cell formatting
+    turndown.addRule('tables', {
+      filter: 'table',
+      replacement: function(content, node) {
+        if (!content.trim()) return '';
+
+        const rows = [];
+        const trs = node.querySelectorAll('tr');
+        for (const tr of trs) {
+          const cells = [];
+          const tds = tr.querySelectorAll('th, td');
+          for (const td of tds) {
+            // Use recursive turndown to preserve bold/italic/links in cells
+            const cellHtml = td.innerHTML || td.textContent || '';
+            cells.push(cellHtml.trim() ? turndown.turndown(cellHtml).trim() : '');
+          }
+          if (cells.length > 0) rows.push(cells);
+        }
+        if (rows.length === 0) return '';
+
+        const maxCols = Math.max(...rows.map(r => r.length));
+        const normalized = rows.map(r => {
+          while (r.length < maxCols) r.push('');
+          return r.map(c => String(c).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' '));
+        });
 
     // Strip images (Mammoth converts to base64 — too bloated)
     converter.addRule('noImages', {
@@ -116,14 +152,11 @@
     const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer }, options);
     const html = result.value || '';
 
-    // Strip any remaining img tags (defense in depth)
-    const cleanHtml = html.replace(/<img\s+[^>]*>/gi, '');
+    // Strip img src attributes but keep alt text as placeholder
+    const cleanHtml = html.replace(/<img\s+[^>]*alt="([^"]*)"[^>]*>/gi, '$1');
 
     const turndown = createTurndown();
     let markdown = turndown.turndown(cleanHtml);
-
-    // Remove any image markdown references
-    markdown = markdown.replace(/!\[.*?\]\(.*?\)/g, '');
     markdown = markdown.replace(/\n{3,}/g, '\n\n').trim();
 
     return '# ' + fileName.replace(/\.[^.]+$/, '') + '\n\n' + markdown;
@@ -207,6 +240,12 @@
         if (!cf.content) continue;
         const parser = new DOMParser();
         const doc = parser.parseFromString(cf.content, 'application/xhtml+xml');
+        // Check for XML parse errors — parseFromString doesn't throw
+        const parseError = doc.querySelector('parsererror');
+        if (parseError) {
+          console.warn('[FTM] EPUB chapter XHTML parse error:', cf.path);
+          continue;
+        }
         const body = doc.body || doc.documentElement;
         if (!body) continue;
 
@@ -257,7 +296,12 @@
       const headers = jsonData[headerIdx];
       if (!headers || headers.length === 0) continue;
 
-      const headerCells = headers.map(h => String(h !== null && h !== undefined ? h : '').replace(/\|/g, '\\|'));
+      const sanitizeCell = (v) => {
+        const s = String(v !== null && v !== undefined ? v : '');
+        const safe = /^[=+\-@]/.test(s) ? "'" + s : s;
+        return safe.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+      };
+      const headerCells = headers.map(sanitizeCell);
       markdown += '| ' + headerCells.join(' | ') + ' |\n';
       markdown += '| ' + headerCells.map(() => '---').join(' | ') + ' |\n';
 
@@ -265,10 +309,7 @@
         const row = jsonData[i];
         if (!row) continue;
         while (row.length < headers.length) row.push('');
-        const cells = headers.map((_, colIdx) => {
-          const val = row[colIdx];
-          return String(val !== undefined && val !== null ? val : '').replace(/\|/g, '\\|');
-        });
+        const cells = headers.map((_, colIdx) => sanitizeCell(row[colIdx]));
         markdown += '| ' + cells.join(' | ') + ' |\n';
       }
       markdown += '\n';
@@ -286,13 +327,12 @@
   // 6. PDF PROCESSING (PDF.js → text extraction → Markdown)
   // ---------------------------------------------------------------------------
 
+  // Worker path is set once in handleProcessRequest after library loads
+
   async function processPdf(arrayBuffer, fileName) {
     if (!pdfjsLib) await loadPdfJs();
 
-    // Set worker source using web_accessible_resources
-    pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.min.js');
-
-    // Validate ArrayBuffer
+    // Validate ArrayBuffer is not empty
     if (!arrayBuffer || arrayBuffer.byteLength === 0) {
       throw new Error('The PDF file is empty.');
     }
@@ -362,21 +402,22 @@
       }
       if (currentLine.trim()) lines.push(currentLine.trim());
 
-      // Build markdown with heading detection
+      // PDF heading detection — conservative approach
+      // PDF.js extracts raw text items. All structural information (font size,
+      // bold, heading styles) is lost. We can only guess based on layout.
+      // Strategy: only promote ALL-CAPS lines that look like section headers.
+      // Do NOT try to detect title-cased headings — too many false positives.
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         if (!line) continue;
 
-        // Detect headings: short lines followed by body text
-        if (line.length < 70 && !line.endsWith('.') && !line.endsWith(',') &&
-            i + 1 < lines.length && lines[i + 1].length > 40) {
+        const isAllCaps = line.length >= 3 && line.length <= 50 &&
+          line === line.toUpperCase() && /[A-Z]{3,}/.test(line) &&
+          !/^\d+$/.test(line) && !line.endsWith('.') && !line.endsWith(',');
+
+        if (isAllCaps) {
           markdown += '## ' + line + '\n\n';
-        }
-        // ALL-CAPS short lines as subheadings
-        else if (line.length < 50 && line === line.toUpperCase() && /[A-Z]/.test(line)) {
-          markdown += '### ' + line + '\n\n';
-        }
-        else {
+        } else {
           markdown += line + '\n\n';
         }
       }
@@ -415,28 +456,25 @@
       const presXml = await presFile.async('text');
       const presDoc = parser.parseFromString(presXml, 'application/xml');
 
-      // Get slide references
+      // Get slide references — parse relationship file ONCE, cache in Map
       const slideRefs = presDoc.querySelectorAll('p\\:sldIdLst sldId, sldId');
       const slideFiles = [];
 
-      for (const sldRef of slideRefs) {
-        const rId = sldRef.getAttribute('r:id');
-        if (!rId) continue;
-
-        const relsFile = zip.file('ppt/_rels/presentation.xml.rels');
-        if (!relsFile) continue;
-
+      const relsMap = new Map();
+      const relsFile = zip.file('ppt/_rels/presentation.xml.rels');
+      if (relsFile) {
         const relsXml = await relsFile.async('text');
         const relsDoc = parser.parseFromString(relsXml, 'application/xml');
-        const rels = relsDoc.querySelectorAll('Relationship');
-        let targetPath = null;
-        for (const rel of rels) {
-          if (rel.getAttribute('Id') === rId) {
-            targetPath = rel.getAttribute('Target');
-            break;
-          }
-        }
+        relsDoc.querySelectorAll('Relationship').forEach(rel => {
+          relsMap.set(rel.getAttribute('Id'), rel.getAttribute('Target'));
+        });
+      }
 
+      for (const sldRef of slideRefs) {
+        const rId = sldRef.getAttribute('r:id');
+        if (!rId || !relsMap.has(rId)) continue;
+
+        const targetPath = relsMap.get(rId);
         if (targetPath) {
           const fullPath = targetPath.startsWith('/') ? targetPath.substring(1) : 'ppt/' + targetPath;
           slideFiles.push(fullPath);
@@ -497,51 +535,11 @@
     return markdown;
   }
 
-  // ===========================================================================
-  // LIBRARY LOADING (Lazy, ON DEMAND)
-  // ===========================================================================
-
-  async function loadMammoth() {
-    if (mammoth) return;
-    await loadScript('lib/mammoth.browser.min.js');
-    mammoth = window.mammoth;
-  }
-
-  async function loadXLSX() {
-    if (XLSX) return;
-    await loadScript('lib/xlsx.mini.min.js');
-    XLSX = window.XLSX;
-  }
-
-  async function loadJSZip() {
-    if (JSZip) return;
-    await loadScript('lib/jszip.min.js');
-    JSZip = window.JSZip;
-  }
-
-  async function loadTurndown() {
-    if (Turndown) return;
-    await loadScript('lib/turndown.min.js');
-    Turndown = window.TurndownService;
-  }
-
-  async function loadTurndownGfm() {
-    if (turndownPluginGfm) return;
-    await loadScript('lib/turndown-plugin-gfm.min.js');
-    turndownPluginGfm = window.turndownPluginGfm;
-  }
-
-  async function loadPdfJs() {
-    if (pdfjsLib) return;
-    await loadScript('lib/pdf.min.js');
-    pdfjsLib = window.pdfjsLib;
-  }
-
-  // ===========================================================================
-  // PORT MESSAGE HANDLER
-  // ===========================================================================
-
-  let port = null;
+  // ---------------------------------------------------------------------------
+  // 8. PORT MESSAGE HANDLER
+  // ---------------------------------------------------------------------------
+  // Listens ONLY for 'ftm-offscreen-internal' — no dual-name ambiguity.
+  // ---------------------------------------------------------------------------
 
   chrome.runtime.onConnect.addListener((p) => {
     if (p.name !== 'ftm-offscreen-internal') return;
@@ -589,7 +587,13 @@
         return { markdown: await processPptx(arrayBuffer, fileName), fileName };
 
       case '.pdf':
-        return { markdown: await processPdf(arrayBuffer, fileName), fileName };
+        if (typeof pdfjsLib === 'undefined') {
+          await loadScript('lib/pdf.min.js');
+          // Set worker path once after library loads
+          pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.min.js');
+        }
+        markdown = await processPdf(arrayBuffer, fileName);
+        break;
 
       default:
         throw new Error('Unsupported binary format: ' + extension);
@@ -601,14 +605,12 @@
   // ===========================================================================
 
   function performAggressiveCleanup() {
-    // Step 1: Nullify ALL global library references
+    // Step 1: Nullify ALL global library references (may be read-only in some contexts)
     if (typeof window !== 'undefined') {
-      window.mammoth = null;
-      window.XLSX = null;
-      window.JSZip = null;
-      window.TurndownService = null;
-      window.pdfjsLib = null;
-      window.turndownPluginGfm = null;
+      const globals = ['mammoth', 'XLSX', 'JSZip', 'TurndownService', 'pdfjsLib'];
+      for (const name of globals) {
+        try { window[name] = null; } catch (_) { /* read-only — ignore */ }
+      }
     }
 
     // Step 2: Null module-scoped references

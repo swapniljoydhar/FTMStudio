@@ -1,25 +1,20 @@
 // ===========================================================================
-// popup.js — Configuration Dashboard Logic (v7)
-// ===========================================================================
-//
-// V7 CHANGES:
-//   - Added 'images' category to checkboxes
-//   - Fixed history rendering to use pure DOM methods (no innerHTML XSS)
-//   - Removed version text drift (now reads from manifest)
-//   - Cleaner config merge on storage change
+// popup.js — FTM Studio v2.0 Configuration Dashboard
+// Elegant, minimal UI with collapsible sections
 // ===========================================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
   let currentConfig = {};
-
+  
   const DEFAULT_CONFIG = {
     enabled: true,
+    smartMode: true,
+    autoConvert: false,
     autoDismissSeconds: 10,
     domainBlacklist: [],
-    categories: {
-      pdf: true, documents: true, spreadsheets: true,
-      code: true, markup: true, presentations: true, images: true
-    },
+    domainWhitelist: [],
+    customAiHosts: [],
+    categories: { pdf: true, documents: true, spreadsheets: true, code: true, markup: true, presentations: true },
     yamlFrontmatter: true,
     csvStreamThreshold: 5,
     stripTrailingWhitespace: true,
@@ -29,45 +24,222 @@ document.addEventListener('DOMContentLoaded', async () => {
     maxConversions: 50
   };
 
-  // ─── DOM REFERENCES ───
-  const masterToggle = document.getElementById('master-toggle');
-  const statusDot = document.getElementById('status-dot');
-  const statusLabel = document.getElementById('status-label');
-  const timerSlider = document.getElementById('timer-slider');
-  const timerValue = document.getElementById('timer-value');
-  const blacklistTextarea = document.getElementById('blacklist-textarea');
-  const yamlToggle = document.getElementById('yaml-toggle');
-  const csvSlider = document.getElementById('csv-threshold-slider');
-  const csvValue = document.getElementById('csv-threshold-value');
-  const stripToggle = document.getElementById('opt-strip-trailing');
-  const headingToggle = document.getElementById('opt-heading-hierarchy');
-  const btnAddRegex = document.getElementById('btn-add-regex');
-  const regexContainer = document.getElementById('regex-rules-container');
-  const historyList = document.getElementById('history-list');
-  const btnExportHistory = document.getElementById('btn-export-history');
-  const btnClearHistory = document.getElementById('btn-clear-history');
+  // ── DOM refs ──
+  const $ = (id) => document.getElementById(id);
+  const masterToggle = $('master-toggle');
+  const smartModeToggle = $('smart-mode');
+  const autoConvertToggle = $('auto-convert');
+  const statusDot = $('status-dot');
+  const statusLabel = $('status-label');
+  const blacklistTextarea = $('blacklist-textarea');
+  const yamlToggle = $('yaml-toggle');
+  const csvSlider = $('csv-threshold-slider');
+  const csvValue = $('csv-threshold-value');
+  const stripToggle = $('opt-strip-trailing');
+  const headingToggle = $('opt-heading-hierarchy');
+  const btnAddRegex = $('btn-add-regex');
+  const regexContainer = $('regex-rules-container');
+  const historyList = $('history-list');
+  const btnExportHistory = $('btn-export-history');
+  const btnClearHistory = $('btn-clear-history');
+  const versionBadge = $('version-badge');
 
-  // ─── VERSION DISPLAY ───
-  const versionEl = document.querySelector('.version');
-  if (versionEl) {
-    const manifest = chrome.runtime.getManifest();
-    versionEl.textContent = 'v' + manifest.version;
+  // ── Version badge ──
+  if (versionBadge) {
+    try {
+      versionBadge.textContent = 'v' + chrome.runtime.getManifest().version;
+    } catch (_) {
+      versionBadge.textContent = 'v2.0';
+    }
   }
 
-  // ─── TAB NAVIGATION ───
+  // ── Tabs ──
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       tab.classList.add('active');
       document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
     });
   });
 
-  // ─── FORMAT BADGES ───
-  const categoryCheckboxes = ['pdf', 'documents', 'spreadsheets', 'code', 'markup', 'presentations', 'images'];
+  // ── Collapsible Cards ──
+  document.querySelectorAll('.card-header').forEach(header => {
+    header.addEventListener('click', () => {
+      const card = header.closest('.collapsible');
+      const contentId = header.dataset.target;
+      const content = $(contentId);
+      
+      card.classList.toggle('expanded');
+      if (card.classList.contains('expanded')) {
+        content.style.display = 'block';
+      } else {
+        content.style.display = 'none';
+      }
+    });
+  });
 
-  // ─── LOAD CONFIG ───
+  // ── AI Sites database ──
+  const AI_CATEGORIES = {
+    'LLM Chatbots': ['chat.openai.com', 'chatgpt.com', 'claude.ai', 'gemini.google.com', 'copilot.microsoft.com', 'chat.deepseek.com', 'chat.mistral.ai', 'huggingface.co', 'poe.com', 'perplexity.ai', 'you.com', 'character.ai', 'meta.ai', 'pi.ai'],
+    'AI Code': ['cursor.com', 'replit.com', 'codeium.com', 'tabnine.com', 'phind.com', 'blackbox.ai', 'devv.ai'],
+    'AI Image': ['midjourney.com', 'stability.ai', 'leonardo.ai', 'ideogram.ai', 'playground.ai', 'firefly.adobe.com', 'canva.com'],
+    'AI Video': ['runwayml.com', 'synthesia.io', 'pika.art', 'heygen.com', 'luma.ai', 'descript.com'],
+    'AI Audio': ['elevenlabs.io', 'play.ht', 'murf.ai', 'suno.com', 'udio.com', 'speechify.com'],
+    'AI Writing': ['jasper.ai', 'copy.ai', 'writesonic.com', 'grammarly.com', 'quillbot.com', 'wordtune.com'],
+    'AI Search': ['perplexity.ai', 'consensus.app', 'elicit.com', 'scite.ai'],
+    'AI Productivity': ['notion.so', 'gamma.app', 'tome.app', 'beautiful.ai', 'fireflies.ai']
+  };
+
+  const siteCategories = $('site-categories');
+  const customSitesList = $('custom-sites-list');
+  const customSiteInput = $('custom-site-input');
+  const addSiteBtn = $('add-site-btn');
+  const resetSitesBtn = $('reset-sites-btn');
+  const enabledCountEl = $('enabled-count');
+  const customCountEl = $('custom-count');
+
+  function getCustomOverrides() {
+    return currentConfig.customAiHosts || [];
+  }
+
+  function isRemoved(host) {
+    return getCustomOverrides().includes('-' + host);
+  }
+
+  function updateSiteStats() {
+    const overrides = getCustomOverrides();
+    const removedCount = overrides.filter(e => e.startsWith('-')).length;
+    const customAdded = overrides.filter(e => e.startsWith('+')).length;
+    
+    let totalEnabled = 0;
+    for (const hosts of Object.values(AI_CATEGORIES)) {
+      totalEnabled += hosts.filter(h => !isRemoved(h)).length;
+    }
+    
+    enabledCountEl.textContent = totalEnabled;
+    customCountEl.textContent = customAdded;
+  }
+
+  function renderAiSites() {
+    siteCategories.innerHTML = '';
+    
+    for (const [cat, hosts] of Object.entries(AI_CATEGORIES)) {
+      const group = document.createElement('div');
+      group.className = 'site-category-group';
+      
+      const name = document.createElement('div');
+      name.className = 'site-category-name';
+      name.textContent = cat;
+      group.appendChild(name);
+      
+      const pills = document.createElement('div');
+      pills.className = 'site-pills';
+      
+      hosts.forEach(h => {
+        const pill = document.createElement('span');
+        pill.className = 'site-pill' + (isRemoved(h) ? ' removed' : '');
+        
+        const text = document.createElement('span');
+        text.textContent = h;
+        pill.appendChild(text);
+        
+        const removeBtn = document.createElement('span');
+        removeBtn.className = 'site-pill-remove';
+        removeBtn.textContent = '×';
+        removeBtn.title = isRemoved(h) ? 'Restore' : 'Remove';
+        removeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleBuiltIn(h);
+        });
+        pill.appendChild(removeBtn);
+        
+        pills.appendChild(pill);
+      });
+      
+      group.appendChild(pills);
+      siteCategories.appendChild(group);
+    }
+
+    customSitesList.innerHTML = '';
+    const customAdded = getCustomOverrides().filter(e => e.startsWith('+'));
+    
+    if (customAdded.length > 0) {
+      const label = document.createElement('div');
+      label.className = 'site-category-name';
+      label.textContent = 'Custom Added';
+      customSitesList.appendChild(label);
+      
+      for (const entry of customAdded) {
+        const domain = entry.substring(1);
+        const row = document.createElement('div');
+        row.className = 'custom-site-row';
+        
+        const span = document.createElement('span');
+        span.textContent = domain;
+        
+        const btn = document.createElement('button');
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+        btn.title = 'Remove';
+        btn.addEventListener('click', () => removeCustom(domain));
+        
+        row.appendChild(span);
+        row.appendChild(btn);
+        customSitesList.appendChild(row);
+      }
+    }
+    
+    updateSiteStats();
+  }
+
+  function toggleBuiltIn(host) {
+    const overrides = [...getCustomOverrides()];
+    const idx = overrides.indexOf('-' + host);
+    if (idx >= 0) {
+      overrides.splice(idx, 1);
+    } else {
+      overrides.push('-' + host);
+    }
+    currentConfig.customAiHosts = overrides;
+    saveConfig({ customAiHosts: overrides });
+    renderAiSites();
+  }
+
+  function removeCustom(domain) {
+    const overrides = getCustomOverrides().filter(e => e !== '+' + domain);
+    currentConfig.customAiHosts = overrides;
+    saveConfig({ customAiHosts: overrides });
+    renderAiSites();
+  }
+
+  addSiteBtn.addEventListener('click', () => {
+    const val = customSiteInput.value.trim().toLowerCase();
+    if (!val) return;
+    const overrides = [...getCustomOverrides()];
+    if (!overrides.includes('+' + val)) {
+      overrides.push('+' + val);
+      currentConfig.customAiHosts = overrides;
+      saveConfig({ customAiHosts: overrides });
+      renderAiSites();
+    }
+    customSiteInput.value = '';
+  });
+
+  customSiteInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addSiteBtn.click(); }
+  });
+
+  resetSitesBtn.addEventListener('click', () => {
+    if (confirm('Reset all AI site settings to defaults?')) {
+      currentConfig.customAiHosts = [];
+      saveConfig({ customAiHosts: [] });
+      renderAiSites();
+    }
+  });
+
+  // ── Config ──
+  const categoryCheckboxes = ['pdf', 'documents', 'spreadsheets', 'code', 'markup', 'presentations'];
+
   async function loadConfig() {
     return new Promise((resolve) => {
       chrome.storage.local.get(null, (items) => {
@@ -81,25 +253,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // ─── SAVE CONFIG ───
   function saveConfig(partial) {
     chrome.storage.local.set(partial);
   }
 
-  // ─── POPULATE UI ───
+  function sanitizeRules(rules) {
+    if (!Array.isArray(rules)) return [];
+    return rules
+      .filter(r => r && r.pattern && typeof r.pattern === 'string')
+      .map(r => ({
+        pattern: r.pattern,
+        replacement: typeof r.replacement === 'string' ? r.replacement : '',
+        flags: (r.flags || 'g').replace(/[^gimsuy]/g, '') || 'g',
+        enabled: r.enabled !== false,
+        name: typeof r.name === 'string' ? r.name : ''
+      }));
+  }
+
+  // ── Populate UI ──
   function populateUI() {
     masterToggle.checked = currentConfig.enabled !== false;
-    updateStatusUI();
-
-    timerSlider.value = currentConfig.autoDismissSeconds || 10;
-    timerValue.textContent = currentConfig.autoDismissSeconds + 's';
+    smartModeToggle.checked = currentConfig.smartMode !== false;
+    autoConvertToggle.checked = !!currentConfig.autoConvert;
+    updateStatus();
 
     blacklistTextarea.value = (currentConfig.domainBlacklist || []).join('\n');
-
     yamlToggle.checked = currentConfig.yamlFrontmatter !== false;
 
     csvSlider.value = currentConfig.csvStreamThreshold || 5;
-    csvValue.textContent = currentConfig.csvStreamThreshold + ' MB';
+    csvValue.textContent = (currentConfig.csvStreamThreshold || 5) + ' MB';
 
     stripToggle.checked = currentConfig.stripTrailingWhitespace !== false;
     headingToggle.checked = !!currentConfig.enforceHeadingHierarchy;
@@ -111,40 +293,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     renderRegexRules();
     renderHistory();
+    renderAiSites();
   }
 
-  function updateStatusUI() {
+  function updateStatus() {
     const active = currentConfig.enabled !== false;
-    if (statusDot) {
-      statusDot.classList.toggle('inactive', !active);
-    }
-    if (statusLabel) {
-      statusLabel.textContent = active ? 'Active' : 'Disabled';
-    }
+    if (statusDot) statusDot.classList.toggle('inactive', !active);
+    if (statusLabel) statusLabel.textContent = active ? 'Active' : 'Disabled';
   }
 
-  // ─── EVENT LISTENERS ───
-
+  // ── Events ──
   masterToggle.addEventListener('change', () => {
     currentConfig.enabled = masterToggle.checked;
     saveConfig({ enabled: currentConfig.enabled });
-    updateStatusUI();
+    updateStatus();
   });
 
-  timerSlider.addEventListener('input', () => {
-    const val = parseInt(timerSlider.value, 10);
-    timerValue.textContent = val + 's';
+  smartModeToggle.addEventListener('change', () => {
+    currentConfig.smartMode = smartModeToggle.checked;
+    saveConfig({ smartMode: currentConfig.smartMode });
   });
-  timerSlider.addEventListener('change', () => {
-    currentConfig.autoDismissSeconds = parseInt(timerSlider.value, 10);
-    saveConfig({ autoDismissSeconds: currentConfig.autoDismissSeconds });
+
+  autoConvertToggle.addEventListener('change', () => {
+    currentConfig.autoConvert = autoConvertToggle.checked;
+    saveConfig({ autoConvert: currentConfig.autoConvert });
   });
 
   blacklistTextarea.addEventListener('change', () => {
-    const domains = blacklistTextarea.value
-      .split('\n')
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
+    const domains = blacklistTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
     currentConfig.domainBlacklist = domains;
     saveConfig({ domainBlacklist: domains });
   });
@@ -183,20 +359,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // ─── REGEX PIPELINE ───
-  function sanitizeRules(rules) {
-    if (!Array.isArray(rules)) return [];
-    return rules
-      .filter(r => r && r.pattern && typeof r.pattern === 'string')
-      .map(r => ({
-        pattern: r.pattern,
-        replacement: typeof r.replacement === 'string' ? r.replacement : '',
-        flags: (r.flags || '').replace(/[^gimsuy]/g, ''),
-        enabled: r.enabled !== false,
-        name: typeof r.name === 'string' ? r.name : ''
-      }));
-  }
-
+  // ── Regex pipeline ──
   function renderRegexRules() {
     // Clear container safely
     while (regexContainer.firstChild) regexContainer.removeChild(regexContainer.firstChild);
@@ -204,11 +367,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const rules = currentConfig.regexPipeline || [];
 
     if (rules.length === 0) {
-      const hint = document.createElement('p');
-      hint.className = 'card-hint';
-      hint.style.cssText = 'padding:4px 0';
-      hint.textContent = 'No custom rules configured. Click "+ Rule" to add one.';
-      regexContainer.appendChild(hint);
+      regexContainer.innerHTML = '<p style="font-size:11px;color:var(--text-3);padding:2px 0">No rules yet.</p>';
       return;
     }
 
@@ -216,118 +375,102 @@ document.addEventListener('DOMContentLoaded', async () => {
       const div = document.createElement('div');
       div.className = 'regex-rule';
 
-      // Header row
       const header = document.createElement('div');
       header.className = 'regex-rule-header';
 
-      const titleSpan = document.createElement('span');
-      titleSpan.className = 'regex-rule-title';
-      titleSpan.textContent = 'Rule ' + (idx + 1);
+      const title = document.createElement('span');
+      title.className = 'regex-rule-title';
+      title.textContent = 'Rule ' + (idx + 1);
 
-      const actionsDiv = document.createElement('div');
-      actionsDiv.style.cssText = 'display:flex;align-items:center;gap:6px';
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display:flex;align-items:center;gap:8px';
 
-      // Toggle
-      const toggleLabel = document.createElement('label');
-      toggleLabel.className = 'mini-toggle';
-      const toggleInput = document.createElement('input');
-      toggleInput.type = 'checkbox';
-      toggleInput.className = 'regex-enabled';
-      toggleInput.dataset.idx = idx;
-      toggleInput.checked = rule.enabled !== false;
-      const toggleTrack = document.createElement('span');
-      toggleTrack.className = 'mini-track';
-      const toggleThumb = document.createElement('span');
-      toggleThumb.className = 'mini-thumb';
-      toggleTrack.appendChild(toggleThumb);
-      toggleLabel.appendChild(toggleInput);
-      toggleLabel.appendChild(toggleTrack);
+      const toggle = document.createElement('input');
+      toggle.type = 'checkbox';
+      toggle.className = 'switch';
+      toggle.dataset.idx = idx;
+      toggle.checked = rule.enabled !== false;
 
-      // Remove button
       const removeBtn = document.createElement('button');
-      removeBtn.className = 'btn-remove';
+      removeBtn.className = 'btn-icon';
       removeBtn.dataset.idx = idx;
-      removeBtn.setAttribute('title', 'Remove rule');
-      removeBtn.textContent = '×';
+      removeBtn.title = 'Remove';
+      removeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 
-      actionsDiv.appendChild(toggleLabel);
-      actionsDiv.appendChild(removeBtn);
-      header.appendChild(titleSpan);
-      header.appendChild(actionsDiv);
+      actions.appendChild(toggle);
+      actions.appendChild(removeBtn);
+      header.appendChild(title);
+      header.appendChild(actions);
 
-      // Pattern input
-      const patternInput = document.createElement('input');
-      patternInput.type = 'text';
-      patternInput.className = 'regex-pattern';
-      patternInput.dataset.idx = idx;
-      patternInput.placeholder = 'Pattern (e.g. https?://\\S+)';
-      patternInput.value = rule.pattern || '';
+      const pattern = document.createElement('input');
+      pattern.type = 'text';
+      pattern.className = 'regex-pattern';
+      pattern.dataset.idx = idx;
+      pattern.placeholder = 'Pattern';
+      pattern.value = rule.pattern || '';
 
-      // Replacement + flags row
-      const ruleRow = document.createElement('div');
-      ruleRow.className = 'regex-rule-row';
+      const row = document.createElement('div');
+      row.className = 'regex-rule-row';
 
-      const replacementInput = document.createElement('input');
-      replacementInput.type = 'text';
-      replacementInput.className = 'regex-replacement';
-      replacementInput.dataset.idx = idx;
-      replacementInput.placeholder = 'Replacement';
-      replacementInput.value = rule.replacement || '';
+      const replacement = document.createElement('input');
+      replacement.type = 'text';
+      replacement.className = 'regex-replacement';
+      replacement.dataset.idx = idx;
+      replacement.placeholder = 'Replacement';
+      replacement.value = rule.replacement || '';
 
-      const flagsInput = document.createElement('input');
-      flagsInput.type = 'text';
-      flagsInput.className = 'regex-flags';
-      flagsInput.dataset.idx = idx;
-      flagsInput.placeholder = 'Flags';
-      flagsInput.value = rule.flags || 'g';
-      flagsInput.style.cssText = 'width:45px;text-align:center';
+      const flags = document.createElement('input');
+      flags.type = 'text';
+      flags.className = 'regex-flags';
+      flags.dataset.idx = idx;
+      flags.placeholder = 'g';
+      flags.value = rule.flags || 'g';
 
-      ruleRow.appendChild(replacementInput);
-      ruleRow.appendChild(flagsInput);
+      row.appendChild(replacement);
+      row.appendChild(flags);
 
       div.appendChild(header);
-      div.appendChild(patternInput);
-      div.appendChild(ruleRow);
+      div.appendChild(pattern);
+      div.appendChild(row);
       regexContainer.appendChild(div);
     });
 
-    // Attach event listeners
-    regexContainer.querySelectorAll('.regex-pattern').forEach(input => {
-      input.addEventListener('change', (e) => {
-        const idx = parseInt(e.target.dataset.idx, 10);
-        currentConfig.regexPipeline[idx].pattern = e.target.value;
+    regexContainer.querySelectorAll('.regex-pattern').forEach(el => {
+      el.addEventListener('change', (e) => {
+        const i = +e.target.dataset.idx;
+        currentConfig.regexPipeline[i].pattern = e.target.value;
         saveConfig({ regexPipeline: currentConfig.regexPipeline });
       });
     });
 
-    regexContainer.querySelectorAll('.regex-replacement').forEach(input => {
-      input.addEventListener('change', (e) => {
-        const idx = parseInt(e.target.dataset.idx, 10);
-        currentConfig.regexPipeline[idx].replacement = e.target.value;
+    regexContainer.querySelectorAll('.regex-replacement').forEach(el => {
+      el.addEventListener('change', (e) => {
+        const i = +e.target.dataset.idx;
+        currentConfig.regexPipeline[i].replacement = e.target.value;
         saveConfig({ regexPipeline: currentConfig.regexPipeline });
       });
     });
 
-    regexContainer.querySelectorAll('.regex-flags').forEach(input => {
-      input.addEventListener('change', (e) => {
-        const idx = parseInt(e.target.dataset.idx, 10);
-        currentConfig.regexPipeline[idx].flags = e.target.value.replace(/[^gimsuy]/g, '');
+    regexContainer.querySelectorAll('.regex-flags').forEach(el => {
+      el.addEventListener('change', (e) => {
+        const i = +e.target.dataset.idx;
+        currentConfig.regexPipeline[i].flags = e.target.value.replace(/[^gimsuy]/g, '');
         saveConfig({ regexPipeline: currentConfig.regexPipeline });
       });
     });
 
-    regexContainer.querySelectorAll('.regex-enabled').forEach(input => {
-      input.addEventListener('change', (e) => {
-        const idx = parseInt(e.target.dataset.idx, 10);
-        currentConfig.regexPipeline[idx].enabled = e.target.checked;
+    regexContainer.querySelectorAll('.regex-enabled, .switch[data-idx]').forEach(el => {
+      el.addEventListener('change', (e) => {
+        const i = +e.target.dataset.idx;
+        currentConfig.regexPipeline[i].enabled = e.target.checked;
         saveConfig({ regexPipeline: currentConfig.regexPipeline });
       });
     });
 
-    regexContainer.querySelectorAll('.btn-remove').forEach(btn => {
+    regexContainer.querySelectorAll('.btn-remove, .btn-icon[data-idx]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const idx = parseInt(e.target.dataset.idx, 10);
-        currentConfig.regexPipeline.splice(idx, 1);
+        const i = +e.target.dataset.idx;
+        currentConfig.regexPipeline.splice(i, 1);
         saveConfig({ regexPipeline: currentConfig.regexPipeline });
         renderRegexRules();
       });
@@ -336,18 +479,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   btnAddRegex.addEventListener('click', () => {
     if (!currentConfig.regexPipeline) currentConfig.regexPipeline = [];
-    currentConfig.regexPipeline.push({
-      pattern: '',
-      replacement: '',
-      flags: 'g',
-      enabled: true,
-      name: ''
-    });
+    currentConfig.regexPipeline.push({ pattern: '', replacement: '', flags: 'g', enabled: true, name: '' });
     saveConfig({ regexPipeline: currentConfig.regexPipeline });
     renderRegexRules();
   });
 
-  // ─── HISTORY ───
+  // ── History ──
   function renderHistory() {
     // Clear container safely
     while (historyList.firstChild) historyList.removeChild(historyList.firstChild);
@@ -355,87 +492,61 @@ document.addEventListener('DOMContentLoaded', async () => {
     const history = currentConfig.conversionHistory || [];
 
     if (history.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'history-empty';
-
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('width', '40');
-      svg.setAttribute('height', '40');
-      svg.setAttribute('viewBox', '0 0 24 24');
-      svg.setAttribute('fill', 'none');
-      svg.setAttribute('stroke', 'currentColor');
-      svg.setAttribute('stroke-width', '1.2');
-
-      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      circle.setAttribute('cx', '12');
-      circle.setAttribute('cy', '12');
-      circle.setAttribute('r', '10');
-
-      const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-      polyline.setAttribute('points', '12 6 12 16 14');
-
-      svg.appendChild(circle);
-      svg.appendChild(polyline);
-      empty.appendChild(svg);
-
-      const p = document.createElement('p');
-      p.textContent = 'No conversions logged';
-      empty.appendChild(p);
-
-      const hint = document.createElement('span');
-      hint.className = 'history-hint';
-      hint.textContent = 'Drag & drop files onto any webpage to begin';
-      empty.appendChild(hint);
-
-      historyList.appendChild(empty);
+      historyList.innerHTML = `
+        <div class="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <p>No conversions yet</p>
+          <span>Drop a file on any webpage to start</span>
+        </div>`;
       return;
     }
 
+    historyList.innerHTML = '';
     for (let i = history.length - 1; i >= 0; i--) {
       const item = history[i];
       const time = new Date(item.timestamp);
       const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      const itemDiv = document.createElement('div');
-      itemDiv.className = 'history-item';
+      const row = document.createElement('div');
+      row.className = 'history-item';
 
-      const fileSpan = document.createElement('span');
-      fileSpan.className = 'history-file';
-      fileSpan.textContent = item.file || '';
+      const file = document.createElement('span');
+      file.className = 'history-file';
+      file.textContent = item.file || '';
 
-      const extSpan = document.createElement('span');
-      extSpan.className = 'history-ext';
-      extSpan.textContent = (item.extension || '').toUpperCase().replace('.', '');
+      const ext = document.createElement('span');
+      ext.className = 'history-ext';
+      ext.textContent = (item.extension || '').toUpperCase().replace('.', '');
 
-      const timeSpan = document.createElement('span');
-      timeSpan.className = 'history-time';
-      timeSpan.textContent = timeStr;
+      const t = document.createElement('span');
+      t.className = 'history-time';
+      t.textContent = timeStr;
 
-      itemDiv.appendChild(fileSpan);
-      itemDiv.appendChild(extSpan);
-      itemDiv.appendChild(timeSpan);
-
-      historyList.appendChild(itemDiv);
+      row.appendChild(file);
+      row.appendChild(ext);
+      row.appendChild(t);
+      historyList.appendChild(row);
     }
   }
 
   btnExportHistory.addEventListener('click', () => {
     const history = currentConfig.conversionHistory || [];
-    if (history.length === 0) return;
-    const json = JSON.stringify(history, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
+    if (!history.length) return;
+    const blob = new Blob([JSON.stringify(history, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     chrome.downloads.download({ url, filename: 'ftm-conversion-history.json', saveAs: true });
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   });
 
   btnClearHistory.addEventListener('click', () => {
-    currentConfig.conversionHistory = [];
-    saveConfig({ conversionHistory: [] });
-    renderHistory();
+    if (confirm('Clear all conversion history?')) {
+      currentConfig.conversionHistory = [];
+      saveConfig({ conversionHistory: [] });
+      renderHistory();
+    }
   });
 
-  // ─── STORAGE SYNC (listen for external changes) ───
+  // ── External config sync ──
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local') {
       chrome.storage.local.get(null, (items) => {
