@@ -117,7 +117,7 @@ FTM.buildMarkdownTable = function (rows, title) {
   const maxCols = Math.max(...rows.map(r => r.length));
   const normalized = rows.map(r => {
     while (r.length < maxCols) r.push('');
-    return r.map(c => String(c).replace(/\|/g, '\\|').replace(/\n/g, ' '));
+    return r.map(c => String(c).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' '));
   });
   const header = '| ' + normalized[0].join(' | ') + ' |';
   const separator = '| ' + normalized[0].map(() => '---').join(' | ') + ' |';
