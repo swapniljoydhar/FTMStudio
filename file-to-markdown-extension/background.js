@@ -250,6 +250,7 @@ const DEFAULT_CONFIG = {
   autoDismissSeconds: 10,
   domainBlacklist: [],
   domainWhitelist: [],
+  customAiHosts: [],
   categories: {
     documents: true,
     pdf: true,

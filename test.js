@@ -120,24 +120,40 @@ function isBlacklisted(hostname, domainBlacklist) {
 }
 
 // --- Smart Mode: shouldActivate ---
-const AI_HOSTS = ['chat.openai.com', 'chatgpt.com', 'claude.ai', 'gemini.google.com', 'copilot.microsoft.com', 'chat.deepseek.com'];
+const AI_HOSTS = ['chat.openai.com', 'chatgpt.com', 'claude.ai', 'gemini.google.com', 'copilot.microsoft.com', 'chat.deepseek.com', 'poe.com'];
 
 function shouldActivate(hostname, config) {
   hostname = hostname.toLowerCase();
   if (isBlacklisted(hostname, config.domainBlacklist)) return false;
   if (!config.smartMode) return true;
+  let matched = false;
   // Check user whitelist
   const wl = config.domainWhitelist || [];
   for (const d of wl) {
     const t = d.trim().toLowerCase();
     if (!t) continue;
-    if (hostname === t || hostname.endsWith('.' + t)) return true;
+    if (hostname === t || hostname.endsWith('.' + t)) { matched = true; break; }
   }
   // Check AI hosts
-  for (const ai of AI_HOSTS) {
-    if (hostname === ai || hostname.endsWith('.' + ai)) return true;
+  if (!matched) {
+    for (const ai of AI_HOSTS) {
+      if (hostname === ai || hostname.endsWith('.' + ai)) { matched = true; break; }
+    }
   }
-  return false;
+  // Check custom overrides
+  const custom = config.customAiHosts || [];
+  for (const entry of custom) {
+    if (!entry || entry.length < 2) continue;
+    const op = entry[0];
+    const domain = entry.substring(1).trim().toLowerCase();
+    if (!domain) continue;
+    if (op === '-') {
+      if (hostname === domain || hostname.endsWith('.' + domain)) return false;
+    } else if (op === '+') {
+      if (hostname === domain || hostname.endsWith('.' + domain)) matched = true;
+    }
+  }
+  return matched;
 }
 
 // --- H6: decrementPending (from content.js) ---
@@ -329,6 +345,23 @@ console.log('\n━━━ Smart Mode: shouldActivate ━━━');
 
   assertEqual(shouldActivate('blocked.com', cfgBlacklist), false, 'Blacklist overrides whitelist + AI');
   assertEqual(shouldActivate('chat.openai.com', cfgBlacklist), true, 'Blacklist: AI site still works');
+}
+
+console.log('\n━━━ Smart Mode: customAiHosts ━━━');
+{
+  // Custom overrides: +add, -remove
+  const cfg = { smartMode: true, domainBlacklist: [], domainWhitelist: [], customAiHosts: ['+my-ai.com', '-poe.com'] };
+
+  assertEqual(shouldActivate('my-ai.com', cfg), true, 'Custom +my-ai.com activates');
+  assertEqual(shouldActivate('sub.my-ai.com', cfg), true, 'Custom +my-ai.com subdomain activates');
+  assertEqual(shouldActivate('poe.com', cfg), false, 'Custom -poe.com removes built-in');
+  assertEqual(shouldActivate('chat.openai.com', cfg), true, 'Other built-in still works');
+  assertEqual(shouldActivate('random-site.com', cfg), false, 'Unknown site skipped');
+
+  // Reset to empty
+  const cfgReset = { smartMode: true, domainBlacklist: [], domainWhitelist: [], customAiHosts: [] };
+  assertEqual(shouldActivate('poe.com', cfgReset), true, 'Reset: poe.com re-activated');
+  assertEqual(shouldActivate('my-ai.com', cfgReset), false, 'Reset: custom site removed');
 }
 
 console.log('\n━━━ Integration: sanitizeCsvCell + buildMarkdownTable ━━━');

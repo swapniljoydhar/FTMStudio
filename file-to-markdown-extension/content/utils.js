@@ -59,6 +59,7 @@ FTM.shouldActivate = function () {
 
   try {
     const hostname = window.location.hostname.toLowerCase();
+    let matched = false;
 
     // Check user whitelist
     const wl = FTM.config.domainWhitelist;
@@ -66,19 +67,35 @@ FTM.shouldActivate = function () {
       for (const domain of wl) {
         const trimmed = domain.trim().toLowerCase();
         if (!trimmed) continue;
-        if (hostname === trimmed || hostname.endsWith('.' + trimmed)) return true;
+        if (hostname === trimmed || hostname.endsWith('.' + trimmed)) { matched = true; break; }
       }
     }
 
     // Check built-in AI hosts
-    for (const ai of FTM.AI_HOSTS) {
-      if (hostname === ai || hostname.endsWith('.' + ai)) return true;
+    if (!matched) {
+      for (const ai of FTM.AI_HOSTS) {
+        if (hostname === ai || hostname.endsWith('.' + ai)) { matched = true; break; }
+      }
     }
 
-    return false;
-  } catch (e) { /* cross-origin — default to activate */
-    return true;
-  }
+    // Check custom overrides (can add OR remove)
+    const custom = FTM.config.customAiHosts;
+    if (custom && custom.length > 0) {
+      for (const entry of custom) {
+        if (!entry || entry.length < 2) continue;
+        const op = entry[0];
+        const domain = entry.substring(1).trim().toLowerCase();
+        if (!domain) continue;
+        if (op === '-') {
+          if (hostname === domain || hostname.endsWith('.' + domain)) return false;
+        } else if (op === '+') {
+          if (hostname === domain || hostname.endsWith('.' + domain)) matched = true;
+        }
+      }
+    }
+
+    return matched;
+  } catch (e) { return true; }
 };
 
 FTM.shouldInterceptFile = function (file) {

@@ -10,6 +10,7 @@ FTM.config = {
   autoDismissSeconds: FTM.CONSTANTS.TOAST_COUNTDOWN_DEFAULT_SEC,
   domainBlacklist: [],
   domainWhitelist: [],
+  customAiHosts: [],
   categories: { documents: true, pdf: true, spreadsheets: true, code: true, markup: true, presentations: true },
   yamlFrontmatter: true,
   csvStreamThreshold: FTM.CONSTANTS.CSV_STREAM_THRESHOLD_MB_DEFAULT,

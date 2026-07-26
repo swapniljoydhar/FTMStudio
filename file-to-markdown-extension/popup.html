@@ -42,9 +42,17 @@
         <h2 class="section-label">Custom Sites</h2>
         <p class="section-hint">Add your own AI tools or sites. One domain per line.</p>
         <textarea id="whitelist-textarea" rows="3" placeholder="my-ai-app.com&#10;internal-tool.company.net&#10;local-llm:8080"></textarea>
-        <details class="help">
-          <summary>Built-in AI sites (auto-detected)</summary>
-          <div class="ai-categories" id="ai-categories"></div>
+        <details class="help" open>
+          <summary>Built-in AI sites (click to edit)</summary>
+          <div class="ai-editor">
+            <div class="ai-editor-input">
+              <input type="text" id="ai-add-input" placeholder="add-new-ai-site.com" />
+              <button class="btn-link" id="ai-add-btn">+ Add</button>
+            </div>
+            <div class="ai-categories" id="ai-categories"></div>
+            <div id="ai-custom-list"></div>
+            <button class="btn-link danger" id="ai-reset-btn" style="margin-top:8px;font-size:11px">Reset to defaults</button>
+          </div>
         </details>
       </section>
 

@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     autoDismissSeconds: 10,
     domainBlacklist: [],
     domainWhitelist: [],
+    customAiHosts: [],
     categories: { pdf: true, documents: true, spreadsheets: true, code: true, markup: true, presentations: true },
     yamlFrontmatter: true,
     csvStreamThreshold: 5,
@@ -62,7 +63,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // ── AI Sites database (categorized) ──
+  // ── AI Sites database (categorized, editable) ──
   const AI_CATEGORIES = {
     'LLM Chatbots': ['chat.openai.com', 'chatgpt.com', 'claude.ai', 'gemini.google.com', 'copilot.microsoft.com', 'chat.deepseek.com', 'chat.mistral.ai', 'huggingface.co', 'poe.com', 'perplexity.ai', 'you.com', 'character.ai', 'meta.ai', 'pi.ai', 'chatglm.cn', 'tongyi.aliyun.com', 'kimi.moonshot.cn', 'doubao.com', 'yiyan.baidu.com'],
     'AI Code': ['cursor.com', 'replit.com', 'codeium.com', 'tabnine.com', 'phind.com', 'blackbox.ai', 'devv.ai'],
@@ -75,23 +76,112 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   const aiCats = document.getElementById('ai-categories');
-  for (const [cat, hosts] of Object.entries(AI_CATEGORIES)) {
-    const div = document.createElement('div');
-    const label = document.createElement('div');
-    label.className = 'ai-cat-name';
-    label.textContent = cat;
-    div.appendChild(label);
-    const row = document.createElement('div');
-    row.className = 'pill-row';
-    hosts.forEach(h => {
-      const pill = document.createElement('span');
-      pill.className = 'pill';
-      pill.textContent = h;
-      row.appendChild(pill);
-    });
-    div.appendChild(row);
-    aiCats.appendChild(div);
+  const aiCustomList = document.getElementById('ai-custom-list');
+  const aiAddInput = document.getElementById('ai-add-input');
+  const aiAddBtn = document.getElementById('ai-add-btn');
+  const aiResetBtn = document.getElementById('ai-reset-btn');
+
+  function getCustomOverrides() {
+    return currentConfig.customAiHosts || [];
   }
+
+  function isRemoved(host) {
+    return getCustomOverrides().includes('-' + host);
+  }
+
+  function renderAiSites() {
+    aiCats.innerHTML = '';
+    for (const [cat, hosts] of Object.entries(AI_CATEGORIES)) {
+      const div = document.createElement('div');
+      const label = document.createElement('div');
+      label.className = 'ai-cat-name';
+      label.textContent = cat;
+      div.appendChild(label);
+      const row = document.createElement('div');
+      row.className = 'pill-row';
+      hosts.forEach(h => {
+        const pill = document.createElement('span');
+        pill.className = 'pill' + (isRemoved(h) ? ' removed' : '');
+        pill.textContent = h;
+        const removeBtn = document.createElement('span');
+        removeBtn.className = 'pill-remove';
+        removeBtn.textContent = '×';
+        removeBtn.title = isRemoved(h) ? 'Restore' : 'Remove';
+        removeBtn.addEventListener('click', () => toggleBuiltIn(h));
+        pill.appendChild(removeBtn);
+        row.appendChild(pill);
+      });
+      div.appendChild(row);
+      aiCats.appendChild(div);
+    }
+
+    aiCustomList.innerHTML = '';
+    const customAdded = getCustomOverrides().filter(e => e.startsWith('+'));
+    if (customAdded.length > 0) {
+      const label = document.createElement('div');
+      label.className = 'ai-cat-name';
+      label.textContent = 'Custom Added';
+      aiCustomList.appendChild(label);
+      for (const entry of customAdded) {
+        const domain = entry.substring(1);
+        const row = document.createElement('div');
+        row.className = 'custom-site-row';
+        const span = document.createElement('span');
+        span.textContent = domain;
+        const btn = document.createElement('button');
+        btn.className = 'btn-remove';
+        btn.textContent = '×';
+        btn.title = 'Remove';
+        btn.addEventListener('click', () => removeCustom(domain));
+        row.appendChild(span);
+        row.appendChild(btn);
+        aiCustomList.appendChild(row);
+      }
+    }
+  }
+
+  function toggleBuiltIn(host) {
+    const overrides = [...getCustomOverrides()];
+    const idx = overrides.indexOf('-' + host);
+    if (idx >= 0) {
+      overrides.splice(idx, 1);
+    } else {
+      overrides.push('-' + host);
+    }
+    currentConfig.customAiHosts = overrides;
+    saveConfig({ customAiHosts: overrides });
+    renderAiSites();
+  }
+
+  function removeCustom(domain) {
+    const overrides = getCustomOverrides().filter(e => e !== '+' + domain);
+    currentConfig.customAiHosts = overrides;
+    saveConfig({ customAiHosts: overrides });
+    renderAiSites();
+  }
+
+  aiAddBtn.addEventListener('click', () => {
+    const val = aiAddInput.value.trim().toLowerCase();
+    if (!val) return;
+    const overrides = [...getCustomOverrides()];
+    if (!overrides.includes('+' + val)) {
+      overrides.push('+' + val);
+      currentConfig.customAiHosts = overrides;
+      saveConfig({ customAiHosts: overrides });
+      renderAiSites();
+    }
+    aiAddInput.value = '';
+  });
+
+  aiAddInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); aiAddBtn.click(); }
+  });
+
+  aiResetBtn.addEventListener('click', () => {
+    currentConfig.customAiHosts = [];
+    saveConfig({ customAiHosts: [] });
+    renderAiSites();
+  });
 
   function updateSmartModeUI() {
     const smart = smartModeToggle.checked;
@@ -157,6 +247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     renderRegexRules();
     renderHistory();
+    renderAiSites();
   }
 
   function updateStatus() {
