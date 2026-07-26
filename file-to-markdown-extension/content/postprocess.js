@@ -108,6 +108,7 @@ FTM.enforceHeadingHierarchy = function (text) {
   });
 };
 
+// keep in sync with popup.js sanitizeRules()
 FTM.sanitizeRegexPipeline = function (rules) {
   if (!Array.isArray(rules)) return [];
   return rules
