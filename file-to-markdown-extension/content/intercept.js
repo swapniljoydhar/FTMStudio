@@ -5,14 +5,15 @@
 window.FTM = window.FTM || {};
 
 let isReDispatching = false;
-let isConverting = false; // Guard against concurrent approvals
+let isConverting = false; // Guard against concurrent conversions
 let activeFiles = null;
 let activeInputEl = null;
 let activeDropEvent = null;
 let activeDataTransfer = null;
+let autoConvertMode = false; // New: automatic conversion without prompt
 
 // ---------------------------------------------------------------------------
-// Keyboard
+// Keyboard shortcuts (for manual override if needed)
 // ---------------------------------------------------------------------------
 function onKeydown(e) {
   if (!FTM.getToastHost()) return;
@@ -25,12 +26,13 @@ function onKeydown(e) {
 // ---------------------------------------------------------------------------
 function showConversionError(fileName, errorMsg) {
   try {
-    // Create a brief error toast
     const host = document.createElement('div');
     host.id = 'ftm-error-toast';
     host.style.cssText = 'position:fixed;top:16px;right:16px;z-index:2147483647;pointer-events:auto;opacity:0;transition:opacity 0.3s;';
     document.documentElement.appendChild(host);
     const root = host.attachShadow({ mode: 'closed' });
+    const safeFileName = fileName.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const safeErrorMsg = errorMsg.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     root.innerHTML = `
       <style>
         .err { font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif; width: 300px; background: #fff; border: 1px solid #e8e8ec; border-radius: 10px; padding: 12px 14px; color: #1a1a1e; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
@@ -42,8 +44,8 @@ function showConversionError(fileName, errorMsg) {
       </style>
       <div class="err">
         <div class="err-title">⚠ Conversion Failed</div>
-        <div class="err-file">${fileName}</div>
-        <div class="err-msg">${errorMsg}</div>
+        <div class="err-file">${safeFileName}</div>
+        <div class="err-msg">${safeErrorMsg}</div>
       </div>
     `;
     void host.offsetHeight;
@@ -56,10 +58,10 @@ function showConversionError(fileName, errorMsg) {
 }
 
 // ---------------------------------------------------------------------------
-// Approve — convert and re-dispatch
+// Approve — convert and re-dispatch (or auto-convert if enabled)
 // ---------------------------------------------------------------------------
 FTM.onApprove = async function () {
-  if (!FTM.getToastHost() || !activeFiles || isConverting) return;
+  if (!activeFiles || isConverting) return;
   isConverting = true;
   if (FTM.getCountdownTimer()) { clearInterval(FTM.getCountdownTimer()); FTM.setCountdownTimer(null); }
   FTM.destroyToast();
@@ -197,6 +199,12 @@ function handleFileInputChange(event) {
 }
 
 function showPrompt(file) {
+  // If auto-convert mode is enabled, skip the toast and convert immediately
+  if (autoConvertMode) {
+    FTM.onApprove();
+    return;
+  }
+
   FTM.createToast();
   const el = FTM.getToastRoot()?.getElementById('ftm-filename');
   if (el) el.textContent = file.name + ' (' + FTM.formatBytes(file.size) + ')';
@@ -235,8 +243,12 @@ document.addEventListener('visibilitychange', () => {
 (async function init() {
   await FTM.loadConfig();
   if (!FTM.config.enabled) return;
+  
+  // Set auto-convert mode based on config
+  autoConvertMode = !!FTM.config.autoConvert;
+  
   document.addEventListener('drop', handleDropCapture, true);
   document.addEventListener('change', handleFileInputChange, true);
   document.addEventListener('keydown', onKeydown, true);
-  console.log('[FTM] Initialized (v1.0.1)');
+  console.log('[FTM] Initialized (v1.0.1)', autoConvertMode ? '(Auto-convert enabled)' : '');
 })();

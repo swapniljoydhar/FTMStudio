@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const DEFAULT_CONFIG = {
     enabled: true,
     smartMode: true,
+    autoConvert: false, // New: automatically convert files without showing prompt
     autoDismissSeconds: 10,
     domainBlacklist: [],
     domainWhitelist: [],
@@ -26,6 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const $ = (id) => document.getElementById(id);
   const masterToggle = $('master-toggle');
   const smartModeToggle = $('smart-mode');
+  const autoConvertToggle = $('auto-convert');
   const whitelistSection = $('whitelist-section');
   const whitelistTextarea = $('whitelist-textarea');
   const statusDot = $('status-dot');
@@ -225,6 +227,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function populateUI() {
     masterToggle.checked = currentConfig.enabled !== false;
     smartModeToggle.checked = currentConfig.smartMode !== false;
+    autoConvertToggle.checked = !!currentConfig.autoConvert;
     updateSmartModeUI();
     updateStatus();
 
@@ -262,6 +265,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentConfig.enabled = masterToggle.checked;
     saveConfig({ enabled: currentConfig.enabled });
     updateStatus();
+  });
+
+  autoConvertToggle.addEventListener('change', () => {
+    currentConfig.autoConvert = autoConvertToggle.checked;
+    saveConfig({ autoConvert: currentConfig.autoConvert });
   });
 
   timerSlider.addEventListener('input', () => {
