@@ -9,8 +9,8 @@
 //   offscreen document. It does NOT hold file data in memory.
 //
 //   Port routing is simplified:
-//     content.js → background (port 'ftm') → offscreen (forward)
-//     offscreen → background → content.js
+//     content/ modules → background (port 'ftm') → offscreen (forward)
+//     offscreen → background → content/ modules
 //
 //   NO dual-port listening in the offscreen. The offscreen listens ONLY
 //   for 'ftm-offscreen-internal'. The content listens for 'ftm'.
