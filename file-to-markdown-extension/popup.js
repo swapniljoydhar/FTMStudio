@@ -4,6 +4,7 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
   let currentConfig = {};
+  // Default configuration — keep in sync with background.js DEFAULT_CONFIG
   const DEFAULT_CONFIG = {
     enabled: true,
     smartMode: true,
@@ -312,6 +313,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ── Regex pipeline ──
+  // keep in sync with postprocess.js sanitizeRegexPipeline()
   function sanitizeRules(rules) {
     if (!Array.isArray(rules)) return [];
     return rules
