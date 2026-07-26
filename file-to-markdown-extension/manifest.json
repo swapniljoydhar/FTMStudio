@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "File to Markdown Converter",
-  "version": "6.5.0",
+  "version": "7.0.0",
   "description": "Automatically detects and intercepts file uploads, converting documents to high-fidelity Markdown. All processing happens 100% locally.",
   "permissions": [
     "storage",
@@ -21,6 +21,7 @@
         "lib/xlsx.mini.min.js",
         "lib/jszip.min.js",
         "lib/turndown.min.js",
+        "lib/turndown-plugin-gfm.min.js",
         "lib/papaparse.min.js",
         "lib/pdf.min.js",
         "lib/pdf.worker.min.js"
@@ -42,8 +43,7 @@
     "128": "icons/icon128.png"
   },
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {

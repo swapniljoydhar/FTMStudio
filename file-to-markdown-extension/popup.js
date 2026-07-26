@@ -1,14 +1,25 @@
 // ===========================================================================
-// popup.js — Configuration Dashboard Logic (v6.5)
+// popup.js — Configuration Dashboard Logic (v7)
+// ===========================================================================
+//
+// V7 CHANGES:
+//   - Added 'images' category to checkboxes
+//   - Fixed history rendering to use pure DOM methods (no innerHTML XSS)
+//   - Removed version text drift (now reads from manifest)
+//   - Cleaner config merge on storage change
 // ===========================================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
   let currentConfig = {};
+
   const DEFAULT_CONFIG = {
     enabled: true,
     autoDismissSeconds: 10,
     domainBlacklist: [],
-    categories: { pdf: true, documents: true, spreadsheets: true, code: true, markup: true, presentations: true },
+    categories: {
+      pdf: true, documents: true, spreadsheets: true,
+      code: true, markup: true, presentations: true, images: true
+    },
     yamlFrontmatter: true,
     csvStreamThreshold: 5,
     stripTrailingWhitespace: true,
@@ -36,6 +47,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnExportHistory = document.getElementById('btn-export-history');
   const btnClearHistory = document.getElementById('btn-clear-history');
 
+  // ─── VERSION DISPLAY ───
+  const versionEl = document.querySelector('.version');
+  if (versionEl) {
+    const manifest = chrome.runtime.getManifest();
+    versionEl.textContent = 'v' + manifest.version;
+  }
+
   // ─── TAB NAVIGATION ───
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -47,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ─── FORMAT BADGES ───
-  const categoryCheckboxes = ['pdf', 'documents', 'spreadsheets', 'code', 'markup', 'presentations'];
+  const categoryCheckboxes = ['pdf', 'documents', 'spreadsheets', 'code', 'markup', 'presentations', 'images'];
 
   // ─── LOAD CONFIG ───
   async function loadConfig() {
@@ -148,6 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentConfig.stripTrailingWhitespace = stripToggle.checked;
     saveConfig({ stripTrailingWhitespace: stripToggle.checked });
   });
+
   headingToggle.addEventListener('change', () => {
     currentConfig.enforceHeadingHierarchy = headingToggle.checked;
     saveConfig({ enforceHeadingHierarchy: headingToggle.checked });
@@ -179,11 +198,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderRegexRules() {
-    regexContainer.innerHTML = '';
+    // Clear container safely
+    while (regexContainer.firstChild) regexContainer.removeChild(regexContainer.firstChild);
+
     const rules = currentConfig.regexPipeline || [];
 
     if (rules.length === 0) {
-      regexContainer.innerHTML = '<p class="card-hint" style="padding:4px 0">No custom rules configured. Click "+ Rule" to add one.</p>';
+      const hint = document.createElement('p');
+      hint.className = 'card-hint';
+      hint.style.cssText = 'padding:4px 0';
+      hint.textContent = 'No custom rules configured. Click "+ Rule" to add one.';
+      regexContainer.appendChild(hint);
       return;
     }
 
@@ -191,18 +216,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       const div = document.createElement('div');
       div.className = 'regex-rule';
 
-      // Create header
+      // Header row
       const header = document.createElement('div');
       header.className = 'regex-rule-header';
-      
+
       const titleSpan = document.createElement('span');
       titleSpan.className = 'regex-rule-title';
       titleSpan.textContent = 'Rule ' + (idx + 1);
-      
+
       const actionsDiv = document.createElement('div');
       actionsDiv.style.cssText = 'display:flex;align-items:center;gap:6px';
-      
-      // Toggle label
+
+      // Toggle
       const toggleLabel = document.createElement('label');
       toggleLabel.className = 'mini-toggle';
       const toggleInput = document.createElement('input');
@@ -217,19 +242,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       toggleTrack.appendChild(toggleThumb);
       toggleLabel.appendChild(toggleInput);
       toggleLabel.appendChild(toggleTrack);
-      
+
       // Remove button
       const removeBtn = document.createElement('button');
       removeBtn.className = 'btn-remove';
       removeBtn.dataset.idx = idx;
       removeBtn.setAttribute('title', 'Remove rule');
       removeBtn.textContent = '×';
-      
+
       actionsDiv.appendChild(toggleLabel);
       actionsDiv.appendChild(removeBtn);
       header.appendChild(titleSpan);
       header.appendChild(actionsDiv);
-      
+
       // Pattern input
       const patternInput = document.createElement('input');
       patternInput.type = 'text';
@@ -237,18 +262,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       patternInput.dataset.idx = idx;
       patternInput.placeholder = 'Pattern (e.g. https?://\\S+)';
       patternInput.value = rule.pattern || '';
-      
-      // Rule row
+
+      // Replacement + flags row
       const ruleRow = document.createElement('div');
       ruleRow.className = 'regex-rule-row';
-      
+
       const replacementInput = document.createElement('input');
       replacementInput.type = 'text';
       replacementInput.className = 'regex-replacement';
       replacementInput.dataset.idx = idx;
       replacementInput.placeholder = 'Replacement';
       replacementInput.value = rule.replacement || '';
-      
+
       const flagsInput = document.createElement('input');
       flagsInput.type = 'text';
       flagsInput.className = 'regex-flags';
@@ -256,16 +281,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       flagsInput.placeholder = 'Flags';
       flagsInput.value = rule.flags || 'g';
       flagsInput.style.cssText = 'width:45px;text-align:center';
-      
+
       ruleRow.appendChild(replacementInput);
       ruleRow.appendChild(flagsInput);
-      
+
       div.appendChild(header);
       div.appendChild(patternInput);
       div.appendChild(ruleRow);
       regexContainer.appendChild(div);
     });
 
+    // Attach event listeners
     regexContainer.querySelectorAll('.regex-pattern').forEach(input => {
       input.addEventListener('change', (e) => {
         const idx = parseInt(e.target.dataset.idx, 10);
@@ -323,49 +349,74 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ─── HISTORY ───
   function renderHistory() {
+    // Clear container safely
+    while (historyList.firstChild) historyList.removeChild(historyList.firstChild);
+
     const history = currentConfig.conversionHistory || [];
+
     if (history.length === 0) {
-      historyList.innerHTML = `
-        <div class="history-empty">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-          </svg>
-          <p>No conversions logged</p>
-          <span class="history-hint">Drag & drop files onto any webpage to begin</span>
-        </div>
-      `;
+      const empty = document.createElement('div');
+      empty.className = 'history-empty';
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', '40');
+      svg.setAttribute('height', '40');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '1.2');
+
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', '12');
+      circle.setAttribute('cy', '12');
+      circle.setAttribute('r', '10');
+
+      const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      polyline.setAttribute('points', '12 6 12 16 14');
+
+      svg.appendChild(circle);
+      svg.appendChild(polyline);
+      empty.appendChild(svg);
+
+      const p = document.createElement('p');
+      p.textContent = 'No conversions logged';
+      empty.appendChild(p);
+
+      const hint = document.createElement('span');
+      hint.className = 'history-hint';
+      hint.textContent = 'Drag & drop files onto any webpage to begin';
+      empty.appendChild(hint);
+
+      historyList.appendChild(empty);
       return;
     }
 
-    let html = '';
     for (let i = history.length - 1; i >= 0; i--) {
       const item = history[i];
       const time = new Date(item.timestamp);
       const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      
-      // Create history item using DOM methods instead of template literal
+
       const itemDiv = document.createElement('div');
       itemDiv.className = 'history-item';
-      
+
       const fileSpan = document.createElement('span');
       fileSpan.className = 'history-file';
       fileSpan.textContent = item.file || '';
-      
+
       const extSpan = document.createElement('span');
       extSpan.className = 'history-ext';
       extSpan.textContent = (item.extension || '').toUpperCase().replace('.', '');
-      
+
       const timeSpan = document.createElement('span');
       timeSpan.className = 'history-time';
       timeSpan.textContent = timeStr;
-      
+
       itemDiv.appendChild(fileSpan);
       itemDiv.appendChild(extSpan);
       itemDiv.appendChild(timeSpan);
-      
-      html += itemDiv.outerHTML;
+
+      historyList.appendChild(itemDiv);
     }
-    historyList.innerHTML = html;
   }
 
   btnExportHistory.addEventListener('click', () => {
@@ -384,14 +435,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderHistory();
   });
 
-  function escapeHtml(str) {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
-  function escapeAttr(str) {
-    return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  }
-
+  // ─── STORAGE SYNC (listen for external changes) ───
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local') {
       chrome.storage.local.get(null, (items) => {
@@ -406,6 +450,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // ─── INITIALIZE ───
   await loadConfig();
   populateUI();
 });

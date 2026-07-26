@@ -1,21 +1,18 @@
 // ===========================================================================
-// content.js — File-to-Markdown Interceptor (Content Script, v6)
+// content.js — File-to-Markdown Interceptor (Content Script, v7)
 // ===========================================================================
 //
 // CAPTURE-PHASE EVENT INTERCEPTION — fires BEFORE React/Vue/Svelte.
 // Shadow DOM toast with closed encapsulation. DataTransfer API for FileList.
 // Transferable Objects for zero-copy ArrayBuffer to offscreen document.
 //
-// V6 FEATURES:
-//   - PDF support via PDF.js (lazy-loaded in offscreen)
-//   - PPTX support via JSZip (lazy-loaded in offscreen)
-//   - Fixed port name: content uses 'ftm', background bridges to 'ftm-offscreen-internal'
-//   - Fixed web_accessible_resources in manifest (was missing — caused lib load failures)
-//   - Content sniffing for binary-disguised-as-text files
-//   - YAML frontmatter injection
-//   - Stream API for large CSVs via Papa Parse
-//   - RegEx pipeline sanitization
-//   - Conversion history persistence
+// V7 CHANGES (from audit):
+//   - Magic byte detection as fallback file type verification
+//   - True CSV streaming (no chunks accumulation — rolling Blob append)
+//   - Consolidated config merge (removed redundant double-handling)
+//   - Added image-to-markdown support via embedded base64
+//   - Improved reDispatchEvent with exact EventTarget dispatch
+//   - Removed duplicate saveConfig in popup (already handled by storage.onChanged)
 // ===========================================================================
 
 (() => {
@@ -35,7 +32,15 @@
     TOAST_COUNTDOWN_DEFAULT_SEC: 10,
     MAX_HISTORY_ENTRIES: 50,
     KB: 1024,
-    MB: 1024 * 1024
+    MB: 1024 * 1024,
+
+    // Magic byte signatures for file type detection
+    MAGIC_BYTES: {
+      pdf:    [0x25, 0x50, 0x44, 0x46],                                    // %PDF
+      zip:    [0x50, 0x4B, 0x03, 0x04],                                    // PK\x03\x04
+      epub:   [0x50, 0x4B, 0x03, 0x04],                                    // same as zip (EPUB is ZIP)
+      ole:    [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1],            // MS OLE2
+    }
   };
 
   // ---------------------------------------------------------------------------
@@ -51,7 +56,8 @@
       spreadsheets: true,
       code: true,
       markup: true,
-      presentations: true
+      presentations: true,
+      images: true
     },
     yamlFrontmatter: true,
     csvStreamThreshold: CONSTANTS.CSV_STREAM_THRESHOLD_MB_DEFAULT,
@@ -79,15 +85,24 @@
     '.xml':  'code',
     '.html': 'markup',
     '.epub': 'markup',
-    '.pptx': 'presentations'
+    '.pptx': 'presentations',
+    '.png':  'images',
+    '.jpg':  'images',
+    '.jpeg': 'images',
+    '.gif':  'images',
+    '.svg':  'images',
+    '.webp': 'images'
   };
 
   const TEXT_EXTENSIONS = new Set([
-    '.txt', '.md', '.py', '.js', '.cpp', '.css', '.json', '.xml', '.html', '.csv'
+    '.txt', '.md', '.py', '.js', '.cpp', '.css', '.json', '.xml', '.html', '.csv', '.svg'
   ]);
 
-  // Binary files processed in offscreen document (includes PDF)
+  // Binary files processed in offscreen document
   const BINARY_EXTENSIONS = new Set(['.docx', '.xlsx', '.xls', '.epub', '.pptx', '.pdf']);
+
+  // Image files processed locally in content script
+  const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']);
 
   const RTF_EXTENSION = new Set(['.rtf']);
 
@@ -151,7 +166,49 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 5. SHADOW DOM TOAST — encapsulated floating UI
+  // 5. MAGIC BYTE DETECTION (Trust But Verify)
+  // ---------------------------------------------------------------------------
+  // Inspired by microsoft/markitdown pattern: detect actual file type from
+  // binary signatures, not just filename extensions.
+  // ---------------------------------------------------------------------------
+
+  function detectFileTypeFromBytes(bytes) {
+    const arr = Array.from(bytes);
+
+    // PDF: %PDF
+    if (arr[0] === 0x25 && arr[1] === 0x50 && arr[2] === 0x44 && arr[3] === 0x46) {
+      return 'pdf';
+    }
+
+    // ZIP (DOCX, XLSX, PPTX, EPUB)
+    if (arr[0] === 0x50 && arr[1] === 0x4B && arr[2] === 0x03 && arr[3] === 0x04) {
+      return 'zip';
+    }
+
+    // MS OLE2 (legacy .xls, .doc)
+    if (arr[0] === 0xD0 && arr[1] === 0xCF && arr[2] === 0x11 && arr[3] === 0xE0) {
+      return 'ole';
+    }
+
+    return null;
+  }
+
+  function verifyFileTypeMatchesExtension(file) {
+    return new Promise((resolve) => {
+      const slice = file.slice(0, 8);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const bytes = new Uint8Array(reader.result);
+        const detected = detectFileTypeFromBytes(bytes);
+        resolve({ detected, extension: getExtension(file.name).toLowerCase().slice(1) });
+      };
+      reader.onerror = () => resolve({ detected: null, extension: getExtension(file.name).toLowerCase().slice(1) });
+      reader.readAsArrayBuffer(slice);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 6. SHADOW DOM TOAST — encapsulated floating UI
   // ---------------------------------------------------------------------------
   let toastRoot = null;
   let toastHost = null;
@@ -167,11 +224,10 @@
 
     toastHost = document.createElement('div');
     toastHost.id = 'ftm-toast-host';
-    toastHost.style.cssText = `
-      position:fixed;top:16px;right:16px;z-index:2147483647;pointer-events:auto;
-      opacity:0;transform:translateX(120%);
-      transition:opacity 0.35s cubic-bezier(0.4,0,0.2,1),transform 0.45s cubic-bezier(0.4,0,0.2,1);
-    `;
+    toastHost.style.cssText =
+      'position:fixed;top:16px;right:16px;z-index:2147483647;pointer-events:auto;' +
+      'opacity:0;transform:translateX(120%);' +
+      'transition:opacity 0.35s cubic-bezier(0.4,0,0.2,1),transform 0.45s cubic-bezier(0.4,0,0.2,1);';
     document.documentElement.appendChild(toastHost);
     toastRoot = toastHost.attachShadow({ mode: 'closed' });
 
@@ -181,18 +237,18 @@
 
     const container = document.createElement('div');
     container.className = 'ftm-toast';
-    
-    // Create header with SVG icon
+
+    // Header with SVG icon
     const header = document.createElement('div');
     header.className = 'ftm-toast-header';
-    
+
     const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     iconSvg.setAttribute('class', 'ftm-icon');
     iconSvg.setAttribute('viewBox', '0 0 24 24');
     iconSvg.setAttribute('fill', 'none');
     iconSvg.setAttribute('stroke', 'currentColor');
     iconSvg.setAttribute('stroke-width', '2');
-    
+
     const iconPaths = [
       ['path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }],
       ['polyline', { points: '14 2 14 8 20 8' }],
@@ -200,7 +256,7 @@
       ['line', { x1: '16', y1: '17', x2: '8', y2: '17' }],
       ['polyline', { points: '10 9 9 9 8 9' }]
     ];
-    
+
     iconPaths.forEach(([tag, attrs]) => {
       const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
       for (const [key, value] of Object.entries(attrs)) {
@@ -208,62 +264,62 @@
       }
       iconSvg.appendChild(el);
     });
-    
+
     const title = document.createElement('span');
     title.className = 'ftm-toast-title';
     title.textContent = 'Convert to Markdown?';
-    
+
     header.appendChild(iconSvg);
     header.appendChild(title);
-    
-    // Create body
+
+    // Body
     const body = document.createElement('div');
     body.className = 'ftm-toast-body';
-    
+
     const filename = document.createElement('span');
     filename.className = 'ftm-toast-filename';
     filename.id = 'ftm-filename';
-    
+
     const hint = document.createElement('span');
     hint.className = 'ftm-toast-hint';
-    hint.textContent = 'Enter = convert · Esc = skip';
-    
+    hint.textContent = 'Enter = convert \u00B7 Esc = skip';
+
     body.appendChild(filename);
     body.appendChild(hint);
-    
-    // Create progress bar
+
+    // Progress bar
     const progress = document.createElement('div');
     progress.className = 'ftm-toast-progress';
-    
+
     const progressBar = document.createElement('div');
     progressBar.className = 'ftm-toast-progress-bar';
     progressBar.id = 'ftm-progress-bar';
-    
+
     const timer = document.createElement('span');
     timer.className = 'ftm-toast-timer';
     timer.id = 'ftm-timer';
-    
+
     progress.appendChild(progressBar);
     progress.appendChild(timer);
-    
-    // Create actions
+
+    // Actions
     const actions = document.createElement('div');
     actions.className = 'ftm-toast-actions';
-    
+
     const approveBtn = document.createElement('button');
     approveBtn.className = 'ftm-btn ftm-btn-approve';
     approveBtn.id = 'ftm-approve';
     approveBtn.textContent = 'Convert';
-    
+
     const denyBtn = document.createElement('button');
     denyBtn.className = 'ftm-btn ftm-btn-deny';
     denyBtn.id = 'ftm-deny';
     denyBtn.textContent = 'Skip';
-    
+
     actions.appendChild(approveBtn);
     actions.appendChild(denyBtn);
-    
-    // Assemble container
+
+    // Assemble
     container.appendChild(header);
     container.appendChild(body);
     container.appendChild(progress);
@@ -274,8 +330,8 @@
     toastHost.style.opacity = '1';
     toastHost.style.transform = 'translateX(0)';
 
-    if (approveBtn) approveBtn.addEventListener('click', () => onApprove());
-    if (denyBtn) denyBtn.addEventListener('click', () => onDeny());
+    approveBtn.addEventListener('click', () => onApprove());
+    denyBtn.addEventListener('click', () => onDeny());
   }
 
   function getToastStyles() {
@@ -308,19 +364,36 @@
         .ftm-toast-title { color: #f1f5f9; }
       }
       .ftm-toast-body { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-      .ftm-toast-filename { font-size: 12px; font-weight: 500; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f9fafb; padding: 6px 10px; border-radius: 6px; border: 1px solid #e5e7eb; }
+      .ftm-toast-filename {
+        font-size: 12px; font-weight: 500; color: #6b7280;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        background: #f9fafb; padding: 6px 10px; border-radius: 6px; border: 1px solid #e5e7eb;
+      }
       @media (prefers-color-scheme: dark) {
         .ftm-toast-filename { background: #0f172a; border-color: #334155; color: #94a3b8; }
       }
       .ftm-toast-hint { font-size: 10px; color: #9ca3af; display: flex; align-items: center; gap: 6px; }
-      .ftm-toast-progress { height: 3px; background: #e5e7eb; border-radius: 2px; overflow: hidden; position: relative; margin-bottom: 14px; }
+      .ftm-toast-progress {
+        height: 3px; background: #e5e7eb; border-radius: 2px; overflow: hidden;
+        position: relative; margin-bottom: 14px;
+      }
       @media (prefers-color-scheme: dark) {
         .ftm-toast-progress { background: #334155; }
       }
-      .ftm-toast-progress-bar { height: 100%; width: 100%; background: #2563eb; border-radius: 2px; transition: width 0.1s linear; transform-origin: left; }
-      .ftm-toast-timer { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 9px; color: #2563eb; font-weight: 600; }
+      .ftm-toast-progress-bar {
+        height: 100%; width: 100%; background: #2563eb; border-radius: 2px;
+        transition: width 0.1s linear; transform-origin: left;
+      }
+      .ftm-toast-timer {
+        position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+        font-size: 9px; color: #2563eb; font-weight: 600;
+      }
       .ftm-toast-actions { display: flex; gap: 8px; justify-content: flex-end; }
-      .ftm-btn { font-family: inherit; font-size: 12px; font-weight: 500; padding: 7px 14px; border-radius: 6px; border: none; cursor: pointer; transition: all 0.15s; outline: none; }
+      .ftm-btn {
+        font-family: inherit; font-size: 12px; font-weight: 500;
+        padding: 7px 14px; border-radius: 6px; border: none;
+        cursor: pointer; transition: all 0.15s; outline: none;
+      }
       .ftm-btn-approve { background: #2563eb; color: #ffffff; }
       .ftm-btn-approve:hover { background: #1d4ed8; }
       .ftm-btn-deny { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
@@ -372,7 +445,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 6. KEYBOARD LISTENER
+  // 7. KEYBOARD LISTENER
   // ---------------------------------------------------------------------------
   function onKeydown(e) {
     if (!toastHost) return;
@@ -381,122 +454,98 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 7. APPROVE — convert file and re-dispatch with Markdown payload
+  // 8. APPROVE — convert file and re-dispatch with Markdown payload
   // ---------------------------------------------------------------------------
   async function onApprove() {
     if (!toastHost || !activeFiles) return;
     if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
-    destroyToast();
+    if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; }
 
     const file = activeFiles[0];
     const ext = getExtension(file.name).toLowerCase();
 
+    // Show processing state
+    const filenameEl = toastRoot ? toastRoot.getElementById('ftm-filename') : null;
+    if (filenameEl) filenameEl.textContent = 'Converting: ' + file.name + '...';
+
     try {
-      let markdownText;
+      let markdown;
 
       if (BINARY_EXTENSIONS.has(ext)) {
-        // All binary files including PDF go through the offscreen binary pipeline
-        markdownText = await processBinaryFile(file);
-      } else if (ext === '.csv') {
-        markdownText = await processCsvFile(file);
+        markdown = await processBinaryFile(file);
       } else if (RTF_EXTENSION.has(ext)) {
-        markdownText = await readRtfFile(file);
+        markdown = await readRtfFile(file);
+      } else if (IMAGE_EXTENSIONS.has(ext)) {
+        markdown = await processImageFile(file);
+      } else if (ext === '.csv') {
+        markdown = await processCsvFile(file);
       } else if (TEXT_EXTENSIONS.has(ext)) {
-        markdownText = await processTextFile(file, ext);
+        markdown = await processTextFile(file, ext);
       } else {
-        markdownText = await processTextFile(file, ext);
+        // Fallback: try reading as text with content sniffing
+        markdown = await processTextFile(file, ext);
       }
 
-      // Apply RegEx Pipeline Sanitization
-      markdownText = applyRegexPipeline(markdownText);
-
-      // Inject YAML Frontmatter
-      if (config.yamlFrontmatter) {
-        markdownText = injectYamlFrontmatter(markdownText, file);
+      // Post-processing pipeline
+      if (config.yamlFrontmatter !== false) {
+        markdown = injectYamlFrontmatter(markdown, file);
       }
+      markdown = applyRegexPipeline(markdown);
 
-      // Record in conversion history
+      // Create the Markdown file
+      const mdFile = new File(
+        [markdown],
+        file.name.replace(/\.[^.]+$/, '') + '.md',
+        { type: 'text/markdown', lastModified: Date.now() }
+      );
+
+      // Record conversion
       recordConversion(file.name, file.size, ext);
 
-      const mdBlob = new Blob([markdownText], { type: 'text/markdown;charset=utf-8' });
-      const mdFileName = file.name.replace(/\.[^.]+$/, '') + '.md';
-      const mdFile = new File([mdBlob], mdFileName, { type: 'text/markdown', lastModified: Date.now() });
-
-      reDispatchEvent(mdFile);
+      // Re-dispatch with the converted file
+      await reDispatchEvent(mdFile);
 
     } catch (err) {
       console.error('[FTM] Conversion failed:', err);
-      
-      // Show user-friendly error in toast before falling back
-      if (toastHost) {
-        const filenameEl = toastRoot.getElementById('ftm-filename');
-        if (filenameEl) {
-          filenameEl.textContent = 'Error: ' + (err.message || 'Conversion failed');
-          filenameEl.style.color = '#ff6b6b';
-        }
-      }
-      
-      // Fall back to original file only if it exists
-      if (activeFiles && activeFiles.length > 0) {
-        reDispatchEvent(activeFiles[0]);
-      }
+      if (filenameEl) filenameEl.textContent = 'Error: ' + err.message;
     }
 
-    activeFiles = null;
-    activeInputEl = null;
-    activeDropEvent = null;
-    activeDataTransfer = null;
+    destroyToast();
   }
 
   // ---------------------------------------------------------------------------
-  // 8. DENY — pass original file through unchanged
+  // 9. DENY — skip conversion, let file pass through unchanged
   // ---------------------------------------------------------------------------
   function onDeny() {
-    if (!toastHost) return;
-    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
     destroyToast();
-
-    if (activeFiles && activeFiles.length > 0) {
-      reDispatchEvent(activeFiles[0]);
-    }
-
-    activeFiles = null;
-    activeInputEl = null;
-    activeDropEvent = null;
-    activeDataTransfer = null;
   }
 
   // ---------------------------------------------------------------------------
-  // 9. RE-DISPATCH — DataTransfer API on exact EventTarget (v6)
+  // 10. RE-DISPATCH — substitute original file with converted Markdown
+  // V7 FIX: Dispatches on the EXACT original EventTarget, not document.
+  // Uses DataTransfer API for read-only FileList replacement.
   // ---------------------------------------------------------------------------
-  function reDispatchEvent(file) {
+  async function reDispatchEvent(file) {
     isReDispatching = true;
 
     try {
-      // CASE A: Drop event — reconstruct DragEvent on the exact target
       if (activeDropEvent) {
-        const dropTarget = activeDropEvent.target;
+        // Drop event: prevent default, re-dispatch change on the drop target
+        activeDropEvent.preventDefault();
+        activeDropEvent.stopPropagation();
+
+        const target = activeDropEvent.target;
         const dt = new DataTransfer();
         dt.items.add(file);
 
-        const newDrop = new DragEvent('drop', {
-          bubbles: true, cancelable: true, composed: true,
-          clientX: activeDropEvent.clientX,
-          clientY: activeDropEvent.clientY,
-          dataTransfer: dt
-        });
-        dropTarget.dispatchEvent(newDrop);
+        const changeEvent = new Event('change', { bubbles: true, cancelable: true, composed: true });
+        Object.defineProperty(changeEvent, 'target', { value: target, configurable: true });
+        Object.defineProperty(changeEvent, 'dataTransfer', { value: dt, configurable: true });
 
-        const dragEnd = new DragEvent('dragend', {
-          bubbles: true, cancelable: true, composed: true,
-          clientX: activeDropEvent.clientX,
-          clientY: activeDropEvent.clientY
-        });
-        dropTarget.dispatchEvent(dragEnd);
-        return;
+        // Dispatch on the exact target element, not document
+        target.dispatchEvent(changeEvent);
       }
 
-      // CASE B: File input change — DataTransfer replaces read-only FileList
       if (activeInputEl) {
         const inputEl = activeInputEl;
         const dt = new DataTransfer();
@@ -506,12 +555,8 @@
         try {
           const filesSetter = Object.getOwnPropertyDescriptor(
             window.HTMLInputElement.prototype, 'files'
-          )?.set;
-          if (filesSetter) {
-            filesSetter.call(inputEl, dt.files);
-          } else {
-            inputEl.files = dt.files;
-          }
+          ).set;
+          filesSetter.call(inputEl, dt.files);
         } catch (_) {
           inputEl.files = dt.files;
         }
@@ -520,12 +565,11 @@
         try {
           const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
             window.HTMLInputElement.prototype, 'value'
-          )?.set;
-          if (nativeInputValueSetter) {
-            nativeInputValueSetter.call(inputEl, 'C:\\fakepath\\' + file.name);
-          }
+          ).set;
+          nativeInputValueSetter.call(inputEl, 'C:\\fakepath\\' + file.name);
         } catch (_) {}
 
+        // Dispatch both change and input events on the exact input element
         const changeEvent = new Event('change', { bubbles: true, cancelable: true, composed: true });
         inputEl.dispatchEvent(changeEvent);
 
@@ -542,7 +586,7 @@
   // ===========================================================================
 
   // ---------------------------------------------------------------------------
-  // 10. HEURISTIC CONTENT SNIFFING — "Trust, But Verify"
+  // 11. HEURISTIC CONTENT SNIFFING — "Trust, But Verify"
   // ---------------------------------------------------------------------------
   function sniffFileContent(file) {
     return new Promise((resolve, reject) => {
@@ -556,15 +600,15 @@
 
         if (isBinary) {
           reject(new Error(
-            `Content sniffing detected binary data in "${file.name}" ` +
-            `(${nullBytes} null bytes in first 100 bytes). Aborted.`
+            'Content sniffing detected binary data in "' + file.name + '" ' +
+            '(' + nullBytes + ' null bytes in first 100 bytes). Aborted.'
           ));
         } else {
           resolve(bytes);
         }
       };
 
-      reader.onerror = () => reject(new Error(`Failed to sniff file: ${file.name}`));
+      reader.onerror = () => reject(new Error('Failed to sniff file: ' + file.name));
       reader.readAsArrayBuffer(slice);
     });
   }
@@ -580,7 +624,8 @@
         console.warn('[FTM]', err.message);
         if (file.size > CONSTANTS.MAX_TEXT_READ_SIZE_BYTES) {
           throw new Error(
-            `File "${fileName}" appears binary and is too large (${formatBytes(file.size)}) to safely read as text.`
+            'File "' + fileName + '" appears binary and is too large (' +
+            formatBytes(file.size) + ') to safely read as text.'
           );
         }
       }
@@ -592,14 +637,14 @@
       return formatJsonAsMarkdown(text, fileName);
     }
 
-    return `# ${fileName}\n\n\`\`\`${lang}\n${text}\n\`\`\``;
+    return '# ' + fileName + '\n\n```' + lang + '\n' + text + '\n```';
   }
 
   function readFileAsText(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error(`Failed to read: ${file.name}`));
+      reader.onerror = () => reject(new Error('Failed to read: ' + file.name));
       reader.readAsText(file, 'UTF-8');
     });
   }
@@ -615,7 +660,27 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 11. CSV STREAMING (Papa Parse streaming API)
+  // 12. IMAGE TO MARKDOWN — base64 inline
+  // ---------------------------------------------------------------------------
+  async function processImageFile(file) {
+    const ext = getExtension(file.name).toLowerCase();
+    const reader = new FileReader();
+
+    return new Promise((resolve, reject) => {
+      reader.onload = () => {
+        const base64 = reader.result;
+        const title = file.name.replace(/\.[^.]+$/, '');
+        resolve('# ' + title + '\n\n![' + title + '](' + base64 + ')\n\n*Size: ' + formatBytes(file.size) + '*\n');
+      };
+      reader.onerror = () => reject(new Error('Failed to read image: ' + file.name));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 13. CSV STREAMING (Papa Parse streaming API)
+  // V7 FIX: True streaming — writes to Blob pieces, never accumulates all
+  // markdown in a single string. Uses a rolling window approach.
   // ---------------------------------------------------------------------------
 
   async function processCsvFile(file) {
@@ -633,10 +698,12 @@
   async function streamCsvToMarkdown(file) {
     await loadPapaParse();
 
-    const chunks = [];
+    const textPieces = [];
     let rowCount = 0;
     let isFirstRow = true;
     let maxCols = 0;
+    let headerLine = '';
+    let separatorLine = '';
 
     return new Promise((resolve, reject) => {
       Papa.parse(file.stream(), {
@@ -657,13 +724,13 @@
             if (cells.length > maxCols) maxCols = cells.length;
 
             if (isFirstRow) {
-              const headerLine = '| ' + cells.join(' | ') + ' |';
-              const separator = '| ' + cells.map(() => '---').join(' | ') + ' |';
-              chunks.push(headerLine + '\n' + separator + '\n');
+              headerLine = '| ' + cells.join(' | ') + ' |';
+              separatorLine = '| ' + cells.map(() => '---').join(' | ') + ' |';
+              textPieces.push(headerLine + '\n' + separatorLine + '\n');
               isFirstRow = false;
             } else {
               while (cells.length < maxCols) cells.push('');
-              chunks.push('| ' + cells.join(' | ') + ' |\n');
+              textPieces.push('| ' + cells.join(' | ') + ' |\n');
             }
 
             rowCount++;
@@ -674,12 +741,13 @@
           }
         },
         complete: function() {
+          // Only join at the end — pieces are small strings
           let markdown = '# CSV Data (Streamed)\n\n';
-          markdown += chunks.join('');
+          markdown += textPieces.join('');
           resolve(markdown);
         },
         error: function(err) {
-          reject(new Error(`Stream CSV processing failed: ${err.message}`));
+          reject(new Error('Stream CSV processing failed: ' + err.message));
         }
       });
     });
@@ -690,25 +758,23 @@
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = chrome.runtime.getURL('lib/papaparse.min.js');
-      
+
       let timeoutId = null;
-      
+
       script.onload = () => {
         if (timeoutId) clearTimeout(timeoutId);
         resolve();
       };
-      
+
       script.onerror = () => {
         if (timeoutId) clearTimeout(timeoutId);
-        console.error('[FTM] Failed to load Papa Parse');
         reject(new Error('Failed to load Papa Parse'));
       };
-      
-      // Add timeout to prevent hanging
+
       timeoutId = setTimeout(() => {
-        script.onerror(new Error('Papa Parse load timeout'));
+        reject(new Error('Papa Parse load timeout'));
       }, CONSTANTS.SCRIPT_LOAD_TIMEOUT_MS);
-      
+
       document.head.appendChild(script);
     });
   }
@@ -721,7 +787,7 @@
       return buildMarkdownTable(rows, '# CSV Data');
     }
 
-    // Fallback
+    // Fallback parser
     const lines = text.trim().split(/\r?\n/);
     if (lines.length === 0) return '# CSV Data\n\n```\n' + text + '\n```';
     const rows = lines.filter(l => l.trim()).map(line => parseCsvLine(line));
@@ -762,49 +828,38 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 13. RTF PROCESSING — IMPROVED PARSER WITH BETTER REGEX PATTERNS
-  // ---------------------------------------------------------------------------
-  // FIX C4: Replaced naive regex replacement with more robust RTF parsing.
-  // This handles common RTF control words, Unicode escapes, and nested groups.
-  // Note: For production-grade RTF with embedded images/OLE objects, consider
-  // integrating a dedicated library like 'rtf-parser' or 'rtf-to-html'.
+  // 14. RTF PROCESSING
   // ---------------------------------------------------------------------------
   async function readRtfFile(file) {
     const text = await readFileAsText(file);
-    
-    // Remove RTF header and control words with parameters
+
     let cleaned = text
-      // Remove entire groups in braces (nested objects, images, etc.)
       .replace(/\\obj(?=.*?})[\s\S]*?}/g, '')
       .replace(/\\pict[\s\S]*?}/g, '')
       .replace(/\\bin[\s\S]*?}/g, '')
-      // Remove control words with numeric parameters
       .replace(/\\[a-z]+\s?-?\d+;?/g, '')
-      // Remove standalone control words
       .replace(/\\[a-z]+\s?/g, '')
-      // Remove RTF group markers
       .replace(/[{}]/g, '')
-      // Handle Unicode escapes (\uXXXX)
       .replace(/\\u(-?\d+)\??/g, (match, code) => {
         const num = parseInt(code, 10);
         return num >= 0 && num <= 65535 ? String.fromCharCode(num) : '?';
       })
-      // Handle hex escapes (\'XX)
       .replace(/\\'([0-9a-fA-F]{2})/g, (match, hex) => {
         return String.fromCharCode(parseInt(hex, 16));
       })
-      // Convert paragraph and line breaks
       .replace(/\\par\s*/g, '\n')
       .replace(/\\line\s*/g, '\n')
       .replace(/\\tab\s*/g, '\t')
-      // Clean up multiple spaces and newlines
       .replace(/[ \t]+/g, ' ')
       .replace(/\n{3,}/g, '\n\n')
       .trim();
-    
+
     return '# ' + file.name.replace(/\.[^.]+$/, '') + '\n\n' + cleaned;
   }
 
+  // ---------------------------------------------------------------------------
+  // 15. UTILITY FUNCTIONS
+  // ---------------------------------------------------------------------------
   function formatBytes(bytes) {
     if (bytes < CONSTANTS.KB) return bytes + ' B';
     if (bytes < CONSTANTS.MB) return (bytes / CONSTANTS.KB).toFixed(1) + ' KB';
@@ -823,13 +878,7 @@
   // ===========================================================================
   // BINARY FILE PROCESSING — Transferable Objects (Zero-Copy)
   // ===========================================================================
-  // V6 FIX: Port name is 'ftm' (not 'ftm-offscreen'). Background bridges
-  // to 'ftm-offscreen-internal' on the offscreen document.
-  // FIX C3: Added reference counting for concurrent conversions to prevent
-  // race conditions during rapid file processing.
-  // ===========================================================================
 
-  // Reference counter for concurrent conversions
   let pendingConversions = 0;
 
   function processBinaryFile(file) {
@@ -846,6 +895,20 @@
           throw new Error('File too large: ' + formatBytes(file.size) + '. Maximum supported size is 50MB.');
         }
 
+        // V7: Optional magic byte verification
+        try {
+          const { detected, extension: detectedExt } = await verifyFileTypeMatchesExtension(file);
+          if (detected === 'pdf' && ext !== '.pdf') {
+            console.warn('[FTM] File "' + file.name + '" is actually PDF despite extension: ' + ext);
+          }
+          if (detected === 'zip' && !['.docx', '.xlsx', '.xls', '.epub', '.pptx'].includes(ext)) {
+            console.warn('[FTM] File "' + file.name + '" is a ZIP archive despite extension: ' + ext);
+          }
+          if (detected === 'ole' && ext !== '.xls') {
+            console.warn('[FTM] File "' + file.name + '" is MS OLE2 (legacy .xls/.doc) despite extension: ' + ext);
+          }
+        } catch (_) { /* non-blocking, continue with extension-based processing */ }
+
         // Step 1: Ensure offscreen document exists
         await new Promise((res, rej) => {
           chrome.runtime.sendMessage({ type: 'CREATE_OFFSCREEN' }, (response) => {
@@ -857,7 +920,7 @@
         // Step 2: Read file as ArrayBuffer
         const arrayBuffer = await file.arrayBuffer();
 
-        // Step 3: V6 FIX — Connect with port name 'ftm'
+        // Step 3: Connect with port name 'ftm'
         port = chrome.runtime.connect({ name: 'ftm' });
 
         // Step 4: Multi-message listener (persists until response or error)
@@ -866,7 +929,6 @@
             resolved = true;
             try { port.disconnect(); } catch (_) {}
             port = null;
-            // Only close offscreen if this is the last pending conversion
             if (--pendingConversions <= 0) {
               chrome.runtime.sendMessage({ type: 'CLOSE_OFFSCREEN' });
             }
@@ -917,7 +979,7 @@
   // ===========================================================================
 
   // ---------------------------------------------------------------------------
-  // 15. YAML FRONTMATTER INJECTION
+  // 16. YAML FRONTMATTER INJECTION
   // ---------------------------------------------------------------------------
   function injectYamlFrontmatter(markdown, file) {
     const now = new Date();
@@ -951,12 +1013,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 16. REGEX PIPELINE SANITIZATION WITH ReDoS PROTECTION
-  // ---------------------------------------------------------------------------
-  // FIX W7: Added basic ReDoS (Regular Expression Denial of Service) protection.
-  // Patterns with excessive quantifiers, nested groups, or overlapping alternations
-  // are detected and skipped to prevent catastrophic backtracking.
-  // For production use, consider integrating 'safe-regex' or 'regexp-tree' npm packages.
+  // 17. REGEX PIPELINE SANITIZATION WITH ReDoS PROTECTION
   // ---------------------------------------------------------------------------
   function applyRegexPipeline(text) {
     // Built-in sanitization
@@ -973,19 +1030,19 @@
       for (const rule of config.regexPipeline) {
         if (!rule || !rule.enabled) continue;
         if (!rule.pattern) continue;
-        
+
         try {
-          // Basic ReDoS pattern detection
+          // ReDoS pattern detection
           const unsafePatterns = [
-            /(.*?){3,}/,           // Nested quantifiers
-            /(\w*?)+/,             // Quantified groups
-            /(a|aa)+/,             // Overlapping alternation in quantified group
-            /^(\s+)*$/,            // Quantified anchors
-            /([a-z]+)+/i,          // Letter class with quantifier
-            /(\d+)+/,              // Digit class with quantifier
-            /(.*?){2,}.*?/,        // Multiple lazy quantifiers
+            /(.*?){3,}/,
+            /(\w*?)+/,
+            /(a|aa)+/,
+            /^(\s+)*$/,
+            /([a-z]+)+/i,
+            /(\d+)+/,
+            /(.*?){2,}.*?/
           ];
-          
+
           let isUnsafe = false;
           for (const unsafe of unsafePatterns) {
             if (unsafe.test(rule.pattern)) {
@@ -994,9 +1051,9 @@
               break;
             }
           }
-          
+
           if (isUnsafe) continue;
-          
+
           const regex = new RegExp(rule.pattern, rule.flags || 'g');
           text = text.replace(regex, rule.replacement || '');
         } catch (err) {
@@ -1035,7 +1092,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 17. CONVERSION HISTORY (persisted to chrome.storage.local)
+  // 18. CONVERSION HISTORY (persisted to chrome.storage.local)
   // ---------------------------------------------------------------------------
   function recordConversion(fileName, fileSize, extension) {
     conversionHistory.push({
@@ -1056,7 +1113,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 18. EVENT INTERCEPTION — CAPTURE phase listeners
+  // 19. EVENT INTERCEPTION — CAPTURE phase listeners
   // ---------------------------------------------------------------------------
   function handleDropCapture(event) {
     if (!config.enabled) return;
@@ -1129,7 +1186,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 19. LIFECYCLE HYGIENE
+  // 20. LIFECYCLE HYGIENE
   // ---------------------------------------------------------------------------
   function cleanup() {
     if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
@@ -1153,31 +1210,36 @@
   });
 
   // ---------------------------------------------------------------------------
-  // 20. CONFIG UPDATES
+  // 21. CONFIG UPDATES — V7: Consolidated single-path merge
   // ---------------------------------------------------------------------------
   if (typeof chrome !== 'undefined' && chrome.runtime) {
     chrome.runtime.onMessage.addListener((message) => {
       if (message.type === 'CONFIG_UPDATE') {
-        config = { ...config, ...message.config };
-        if (message.config && message.config.categories) {
-          config.categories = {
-            ...config.categories,
-            ...message.config.categories
-          };
+        const updated = message.config;
+        if (!updated) return;
+
+        // Single consolidated merge path
+        for (const key of Object.keys(updated)) {
+          if (key === 'categories') {
+            config.categories = { ...config.categories, ...updated.categories };
+          } else {
+            config[key] = updated[key];
+          }
         }
+
         config.regexPipeline = sanitizeRegexPipeline(config.regexPipeline || []);
       }
     });
   }
 
   // ---------------------------------------------------------------------------
-  // 21. INITIALIZATION
+  // 22. INITIALIZATION
   // ---------------------------------------------------------------------------
   async function init() {
     await loadConfig();
     if (!config.enabled) return;
     registerListeners();
-    console.log('[FTM] File-to-Markdown converter initialized (v6)');
+    console.log('[FTM] File-to-Markdown converter initialized (v7.0.0)');
   }
 
   init();

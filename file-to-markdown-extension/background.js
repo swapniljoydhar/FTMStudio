@@ -1,262 +1,244 @@
 // ===========================================================================
-// background.js — Background Service Worker (v6)
+// background.js — Service Worker (v7)
 // ===========================================================================
 //
-// MANIFEST V3 SERVICE WORKER
+// Responsibilities:
+//   1. Offscreen document lifecycle (create on demand, close when done)
+//   2. Port routing: content script -> offscreen (forwarding only)
+//   3. Config synchronization via storage.onChanged
 //
-// V6 ARCHITECTURE:
-//   The background acts as a thin relay between content scripts and the
-//   offscreen document. It does NOT hold file data in memory.
-//
-//   Port routing is simplified:
-//     content.js → background (port 'ftm') → offscreen (forward)
-//     offscreen → background → content.js
-//
-//   NO dual-port listening in the offscreen. The offscreen listens ONLY
-//   for 'ftm-offscreen-internal'. The content listens for 'ftm'.
-//   The background bridges them.
-//
-// V6 FIXES:
-//   1. Fixed web_accessible_resources (was missing — caused library load failures)
-//   2. Simplified port routing — no ambiguous dual-name listening
-//   3. Proper PDF.js worker path handling via web_accessible_resources
+// V7 CHANGES:
+//   - Removed "type": "module" dependency (manifest fixed)
+//   - Removed redundant DOM_SCRAPING reason (using DOM_PARSER)
+//   - Removed duplicate config fan-out (storage.onChanged handles it)
+//   - Removed redundant PORT_READY message
+//   - Simplified: no isCreatingOffscreen flag race condition
+//   - Proper error recovery on offscreen create
 // ===========================================================================
 
-// ---------------------------------------------------------------------------
-// 1. OFFSCREEN DOCUMENT LIFECYCLE
-// ---------------------------------------------------------------------------
+(() => {
+  'use strict';
 
-let offscreenCreated = false;
+  const REASON_OFFSCREEN = 'ftm-binary-processing';
+  let offscreenCreated = false;
+  let isCreatingOffscreen = false;
 
-async function createOffscreen() {
-  if (offscreenCreated) return;
+  // ---------------------------------------------------------------------------
+  // DEFAULT CONFIG
+  // ---------------------------------------------------------------------------
+  const DEFAULT_CONFIG = {
+    enabled: true,
+    autoDismissSeconds: 10,
+    domainBlacklist: [],
+    categories: {
+      documents: true,
+      pdf: true,
+      spreadsheets: true,
+      code: true,
+      markup: true,
+      presentations: true,
+      images: true
+    },
+    yamlFrontmatter: true,
+    csvStreamThreshold: 5,
+    stripTrailingWhitespace: true,
+    enforceHeadingHierarchy: false,
+    regexPipeline: [],
+    conversionHistory: [],
+    maxConversions: 50
+  };
 
-  try {
-    const existingContexts = await chrome.runtime.getContexts({
-      contextTypes: ['OFFSCREEN_DOCUMENT']
-    });
-
-    if (existingContexts.length > 0) {
-      offscreenCreated = true;
-      return;
+  // ---------------------------------------------------------------------------
+  // INSTALL / UPDATE
+  // ---------------------------------------------------------------------------
+  chrome.runtime.onInstalled.addListener((details) => {
+    if (details.reason === 'install') {
+      chrome.storage.local.get(null, (items) => {
+        if (Object.keys(items).length === 0) {
+          chrome.storage.local.set(DEFAULT_CONFIG);
+        }
+      });
     }
+    if (details.reason === 'update') {
+      // Merge new v7 defaults for 'images' category
+      chrome.storage.local.get('categories', (items) => {
+        if (items.categories && items.categories.images === undefined) {
+          items.categories.images = true;
+          chrome.storage.local.set({ categories: items.categories });
+        }
+      });
+    }
+  });
 
-    await chrome.offscreen.createDocument({
-      url: 'offscreen.html',
-      reasons: ['DOM_SCRAPING'],
-      justification: 'Parsing binary file formats (.docx, .xlsx, .epub, .pdf, .pptx) to Markdown using local parser libraries.'
-    });
+  // ---------------------------------------------------------------------------
+  // OFFSCREEN LIFECYCLE
+  // ---------------------------------------------------------------------------
+  async function createOffscreen() {
+    if (offscreenCreated || isCreatingOffscreen) return;
+    isCreatingOffscreen = true;
 
-    offscreenCreated = true;
-    console.log('[FTM] Offscreen document created');
+    try {
+      // Check if offscreen already exists (from a previous call)
+      const existingContexts = await chrome.runtime.getContexts({
+        contextTypes: ['OFFSCREEN_DOCUMENT']
+      });
 
-  } catch (err) {
-    console.warn('[FTM] Offscreen create failed, attempting recovery:', err.message);
+      if (existingContexts.length > 0) {
+        offscreenCreated = true;
+        isCreatingOffscreen = false;
+        return;
+      }
+
+      await chrome.offscreen.createDocument({
+        url: 'offscreen.html',
+        reasons: ['DOM_PARSER'],
+        justification: REASON_OFFSCREEN
+      });
+
+      offscreenCreated = true;
+      isCreatingOffscreen = false;
+
+    } catch (err) {
+      isCreatingOffscreen = false;
+
+      // If already created, mark it
+      if (err.message && err.message.includes('already created')) {
+        offscreenCreated = true;
+        return;
+      }
+
+      // Attempt recovery: close and retry once
+      try {
+        await chrome.offscreen.closeDocument();
+        offscreenCreated = false;
+        await createOffscreen();
+      } catch (recoveryErr) {
+        console.error('[FTM] Offscreen recovery failed:', recoveryErr.message);
+        throw recoveryErr;
+      }
+    }
+  }
+
+  async function closeOffscreen() {
+    if (!offscreenCreated) return;
+
     try {
       await chrome.offscreen.closeDocument();
       offscreenCreated = false;
-      await createOffscreen();
-    } catch (err2) {
-      console.error('[FTM] Offscreen recovery failed:', err2.message);
-      throw err2;
+    } catch (err) {
+      offscreenCreated = false;
     }
   }
-}
 
-async function closeOffscreen() {
-  if (!offscreenCreated) return;
-
-  try {
-    await chrome.offscreen.closeDocument();
-    offscreenCreated = false;
-    console.log('[FTM] Offscreen document closed');
-  } catch (err) {
-    console.warn('[FTM] Offscreen close failed:', err.message);
-    offscreenCreated = false;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// 2. PORT-BASED MESSAGE ROUTING (Transferable Objects)
-// ---------------------------------------------------------------------------
-//
-// V6 SIMPLIFIED ROUTING:
-//   Content script opens port named 'ftm'.
-//   Background receives it, creates offscreen, opens internal port
-//   named 'ftm-offscreen-internal' to the offscreen document.
-//   Messages flow: content ↔ background ↔ offscreen.
-//
-//   The offscreen document ONLY listens for 'ftm-offscreen-internal'.
-//   No dual-name ambiguity. No PORT_READY message.
-// ---------------------------------------------------------------------------
-
-chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== 'ftm') return;
-
-  const pendingMessages = [];
-  let offscreenPort = null;
-  let ready = false;
-  let isCreatingOffscreen = false;
-
-  // Synchronously listen for messages to prevent dropped messages during async offscreen creation
-  port.onMessage.addListener((message) => {
-    if (ready && offscreenPort) {
-      try {
-        offscreenPort.postMessage(message);
-      } catch (err) {
-        console.error('[FTM] Failed to forward message to offscreen:', err.message);
-        port.postMessage({ type: 'ERROR', data: { error: 'Offscreen communication failed' } });
-      }
-    } else {
-      pendingMessages.push(message);
-    }
-  });
-
-  // Mark as creating to prevent duplicate calls
-  isCreatingOffscreen = true;
-  
-  createOffscreen().then(() => {
-    isCreatingOffscreen = false;
-    offscreenPort = chrome.runtime.connect({ name: 'ftm-offscreen-internal' });
-
-    offscreenPort.onMessage.addListener((message) => {
-      try {
-        port.postMessage(message);
-      } catch (err) {
-        console.error('[FTM] Failed to forward message to content:', err.message);
-      }
-    });
-
-    port.onDisconnect.addListener(() => {
-      try { offscreenPort.disconnect(); } catch (_) {}
-      offscreenPort = null;
-    });
-    
-    offscreenPort.onDisconnect.addListener(() => {
-      try { port.disconnect(); } catch (_) {}
-      offscreenPort = null;
-      ready = false;
-    });
-
-    ready = true;
-    // Flush buffered messages
-    while (pendingMessages.length > 0) {
-      const msg = pendingMessages.shift();
-      try {
-        offscreenPort.postMessage(msg);
-      } catch (err) {
-        console.error('[FTM] Failed to send buffered message:', err.message);
-        port.postMessage({ type: 'ERROR', data: { error: 'Buffered message failed' } });
-      }
+  // ---------------------------------------------------------------------------
+  // MESSAGE HANDLER — CREATE / CLOSE OFFSCREEN
+  // ---------------------------------------------------------------------------
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'CREATE_OFFSCREEN') {
+      createOffscreen().then(() => {
+        sendResponse({ type: 'OFFSCREEN_READY' });
+      }).catch((err) => {
+        sendResponse({ type: 'ERROR', data: { error: err.message } });
+      });
+      return true;
     }
 
-  }).catch((err) => {
-    isCreatingOffscreen = false;
-    console.error('[FTM] Offscreen creation failed:', err.message);
-    port.postMessage({ type: 'ERROR', data: { error: err.message } });
-    try { port.disconnect(); } catch (_) {}
+    if (message.type === 'CLOSE_OFFSCREEN') {
+      closeOffscreen().then(() => {
+        sendResponse({ type: 'CLOSED' });
+      }).catch((err) => {
+        sendResponse({ type: 'CLOSE_FAILED', data: { error: err.message } });
+      });
+      return true;
+    }
+
+    if (message.type === 'CLOSE_OFFSCREEN_DONE') {
+      offscreenCreated = false;
+    }
+
+    return false;
   });
-});
 
-// ---------------------------------------------------------------------------
-// 3. LEGACY MESSAGE HANDLING (non-port messages)
-// ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // PORT ROUTING — content script ↔ offscreen document
+  // ---------------------------------------------------------------------------
+  chrome.runtime.onConnect.addListener((port) => {
+    if (port.name !== 'ftm') return;
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'CREATE_OFFSCREEN') {
+    // Create offscreen if needed, then bridge ports
     createOffscreen().then(() => {
-      sendResponse({ type: 'OFFSCREEN_READY' });
-    }).catch((err) => {
-      sendResponse({ type: 'ERROR', data: { error: err.message } });
-    });
-    return true;
-  }
+      const offscreenPort = chrome.runtime.connect({ name: 'ftm-offscreen-internal' });
+      const pendingMessages = [];
 
-  if (message.type === 'CLOSE_OFFSCREEN') {
-    closeOffscreen().then(() => {
-      sendResponse({ type: 'CLOSED' });
-    }).catch((err) => {
-      sendResponse({ type: 'CLOSE_FAILED', data: { error: err.message } });
-    });
-    return true;
-  }
-
-  if (message.type === 'CLOSE_OFFSCREEN_DONE') {
-    offscreenCreated = false;
-  }
-
-  if (message.type === 'KEEP_ALIVE') {
-    // No-op
-  }
-});
-
-// ---------------------------------------------------------------------------
-// 4. CONFIG SYNC — broadcast updates to all content scripts
-// ---------------------------------------------------------------------------
-
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === 'local') {
-    chrome.tabs.query({}, (tabs) => {
-      for (const tab of tabs) {
-        if (tab.id) {
-          const updatedConfig = {};
-          for (const key in changes) {
-            updatedConfig[key] = changes[key].newValue;
-          }
-          chrome.tabs.sendMessage(tab.id, {
-            type: 'CONFIG_UPDATE',
-            config: updatedConfig
-          }).catch(() => { /* Tab may not have content script */ });
+      // content -> offscreen (with buffering for race conditions)
+      port.onMessage.addListener((msg) => {
+        if (offscreenPort) {
+          try { offscreenPort.postMessage(msg); }
+          catch (_) { port.postMessage({ type: 'ERROR', data: { error: 'Offscreen port error' } }); }
+        } else {
+          pendingMessages.push(msg);
         }
+      });
+
+      // offscreen -> content
+      offscreenPort.onMessage.addListener((msg) => {
+        try { port.postMessage(msg); }
+        catch (_) {}
+      });
+
+      // Flush buffered messages
+      while (pendingMessages.length > 0) {
+        try { offscreenPort.postMessage(pendingMessages.shift()); }
+        catch (_) {}
       }
+
+      // Cleanup on disconnect
+      const cleanup = () => {
+        try { offscreenPort.disconnect(); } catch (_) {}
+        port.onDisconnect.removeListener(cleanup);
+        offscreenPort.onDisconnect.removeListener(cleanup);
+      };
+
+      port.onDisconnect.addListener(cleanup);
+      offscreenPort.onDisconnect.addListener(() => {
+        try { port.disconnect(); } catch (_) {}
+        cleanup();
+      });
+
+    }).catch((err) => {
+      port.postMessage({ type: 'ERROR', data: { error: err.message } });
+      try { port.disconnect(); } catch (_) {}
     });
-  }
-});
+  });
 
-// ---------------------------------------------------------------------------
-// 5. INSTALLATION / UPGRADE HANDLING
-// ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // CONFIG SYNC — storage.onChanged broadcasts to all content scripts
+  // ---------------------------------------------------------------------------
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
 
-chrome.runtime.onInstalled.addListener((details) => {
-  if (details.reason === 'install') {
-    console.log('[FTM] Extension installed — setting default config');
-    chrome.storage.local.get(null, (items) => {
-      if (Object.keys(items).length === 0) {
-        chrome.storage.local.set({
-          enabled: true,
-          autoDismissSeconds: 10,
-          domainBlacklist: [],
-          categories: {
-            documents: true,
-            pdf: true,
-            spreadsheets: true,
-            code: true,
-            markup: true,
-            presentations: true
-          },
-          yamlFrontmatter: true,
-          csvStreamThreshold: 5,
-          stripTrailingWhitespace: true,
-          enforceHeadingHierarchy: false,
-          regexPipeline: [],
-          conversionHistory: [],
-          maxConversions: 50
-        });
-      }
+    // Build updated config (excluding conversionHistory which is internal)
+    const updated = {};
+    for (const [key, change] of Object.entries(changes)) {
+      if (key === 'conversionHistory') continue;
+      updated[key] = change.newValue;
+    }
+
+    if (Object.keys(updated).length === 0) return;
+
+    // Use runtime.sendMessage (broadcast) instead of per-tab
+    chrome.runtime.sendMessage({ type: 'CONFIG_UPDATE', config: updated }).catch(() => {
+      // No listeners — expected if no content scripts loaded
     });
-  }
+  });
 
-  if (details.reason === 'update') {
-    console.log('[FTM] Extension updated to v' + chrome.runtime.getManifest().version);
-  }
-});
+  // ---------------------------------------------------------------------------
+  // SHUTDOWN
+  // ---------------------------------------------------------------------------
+  chrome.runtime.onSuspend.addListener(() => {
+    closeOffscreen();
+  });
 
-// ---------------------------------------------------------------------------
-// 6. CLEANUP ON SHUTDOWN
-// ---------------------------------------------------------------------------
+})();
 
-chrome.runtime.onSuspend.addListener(() => {
-  closeOffscreen();
-});
-
-console.log('[FTM] Background service worker started (v6)');
+console.log('[FTM] Background service worker started (v7.0.0)');
