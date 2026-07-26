@@ -103,10 +103,13 @@ Smart Mode (default: ON) restricts interception to known AI/chatbot platforms.
 2. If Smart Mode is OFF → **activate everywhere**
 3. If Smart Mode is ON:
    - Check user whitelist (custom sites) → **activate if match**
-   - Check built-in AI host database (~200 sites) → **activate if match**
+   - Check built-in AI host database (~188 sites) → **activate if match**
+   - Apply custom overrides: `-domain` removes, `+domain` adds
    - Otherwise → **skip**
 
-**Built-in database:** ~200 AI platforms across 10 categories (LLM chatbots, AI code, image, video, audio, writing, search, productivity, design, education).
+**Built-in database:** ~188 AI platforms across 10 categories (LLM chatbots, AI code, image, video, audio, writing, search, productivity, design, education).
+
+**Custom overrides (`customAiHosts`):** Users can add or remove AI sites without modifying source code. Stored in `chrome.storage.local` as `+domain` (add) or `-domain` (remove) entries.
 
 **Security benefit:** Reduces attack surface by not injecting content scripts into banking, email, or government sites.
 
@@ -132,14 +135,17 @@ Smart Mode (default: ON) restricts interception to known AI/chatbot platforms.
 | History write debouncing | ✅ |
 | SRI hashes for libraries | ✅ |
 | CSP in manifest | ✅ |
+| Library lockfile with SHA-256 | ✅ |
+| Editable AI site database | ✅ |
+| Custom AI host overrides (+/-) | ✅ |
 | Port-based lifecycle management | ✅ |
 
 ---
 
 ## Test Coverage
 
-79 unit tests in `test.js` covering:
-- ReDoS safety (6 tests)
+87 unit tests in `test.js` covering:
+- ReDoS safety (7 tests)
 - YAML injection (9 tests)
 - CSV injection (10 tests)
 - Domain blacklist (9 tests)
@@ -148,6 +154,7 @@ Smart Mode (default: ON) restricts interception to known AI/chatbot platforms.
 - Magic byte detection (7 tests)
 - Regex sanitization (8 tests)
 - Smart Mode activation (13 tests)
+- Smart Mode custom overrides (7 tests)
 - Integration tests (4 tests)
 
 ---

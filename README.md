@@ -162,7 +162,17 @@ lib/                # Third-party parsers (mammoth, xlsx, pdf.js, jszip, turndow
 node test.js
 ```
 
-79 tests covering security-critical functions (ReDoS, CSV injection, YAML injection, domain matching, Smart Mode, heading hierarchy, magic byte detection, regex sanitization).
+87 tests covering security-critical functions (ReDoS, CSV injection, YAML injection, domain matching, Smart Mode, heading hierarchy, magic byte detection, regex sanitization).
+
+### Library Management
+
+Libraries are pinned in `lib/lockfile.json` with SHA-256 hashes.
+
+```bash
+./lib/update.sh          # Verify all 7 libraries
+./lib/update.sh pdfjs    # Update PDF.js specifically
+./lib/update.sh all      # Update everything
+```
 
 ### Project Structure
 
