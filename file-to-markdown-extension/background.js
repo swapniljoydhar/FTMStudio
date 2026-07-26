@@ -1,5 +1,5 @@
 // ===========================================================================
-// background.js — Background Service Worker (v1.0.1)
+// background.js — Background Service Worker (v2.0)
 // ===========================================================================
 //
 // MANIFEST V3 SERVICE WORKER
@@ -20,6 +20,7 @@
 //   1. Fixed web_accessible_resources (was missing — caused library load failures)
 //   2. Simplified port routing — no ambiguous dual-name listening
 //   3. Proper PDF.js worker path handling via web_accessible_resources
+//   4. Removed Node.js process.env references (Chrome extensions don't have process)
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
@@ -233,11 +234,9 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
           chrome.tabs.sendMessage(tab.id, {
             type: 'CONFIG_UPDATE',
             config: updatedConfig
-          }).catch((err) => { 
+          }).catch(() => { 
             // Silently ignore - tab may not have content script or may be closed
-            if (process.env.NODE_ENV === 'development') {
-              console.debug('[FTM] Config sync failed for tab:', tab.id, err.message);
-            }
+            // Chrome extensions don't have process.env
           });
         }
       }
@@ -307,4 +306,4 @@ chrome.runtime.onSuspend.addListener(() => {
   closeOffscreen();
 });
 
-console.log('[FTM] Background service worker started (v1.0.1)');
+console.log('[FTM] Background service worker started (v2.0)');
