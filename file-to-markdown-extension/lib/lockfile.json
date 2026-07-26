@@ -6,7 +6,8 @@
       "version": "unknown",
       "source": "https://cdn.jsdelivr.net/npm/mammoth@latest/mammoth.browser.min.js",
       "npm": "https://www.npmjs.com/package/mammoth",
-      "sha256": "596ef52239e52d8ee3cee10b2ee4a72596abf900d0e4f468593f956e9f1809b0",
+      "sha256": "WW71IjnlLY7jzuELLuSnJZar+QDQ5PRoWT+Vbp8YCbA=",
+      "sha256_hex": "596ef52239e52d8ee3cee10b2ee4a72596abf900d0e4f468593f956e9f1809b0",
       "size": 642759,
       "purpose": "DOCX → semantic HTML"
     },
@@ -14,7 +15,8 @@
       "version": "0.18.5",
       "source": "https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.mini.min.js",
       "npm": "https://www.npmjs.com/package/xlsx",
-      "sha256": "3120abba1fd0ea031f25ab22ac93e726f6f63467da1a6349b82e82f3df5d775c",
+      "sha256": "MSCruh/Q6gMfJasirJPnJvb2NGfaGmNJuC6C899dd1w=",
+      "sha256_hex": "3120abba1fd0ea031f25ab22ac93e726f6f63467da1a6349b82e82f3df5d775c",
       "size": 250826,
       "purpose": "XLSX/XLS → JSON (read-only)"
     },
@@ -22,7 +24,8 @@
       "version": "3.10.1",
       "source": "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js",
       "npm": "https://www.npmjs.com/package/jszip",
-      "sha256": "acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e",
+      "sha256": "rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=",
+      "sha256_hex": "acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e",
       "size": 97630,
       "purpose": "ZIP archive handling (EPUB, PPTX)"
     },
@@ -30,7 +33,8 @@
       "version": "3.4.7",
       "source": "https://cdn.jsdelivr.net/npm/turndown@3.4.7/dist/turndown.min.js",
       "npm": "https://www.npmjs.com/package/turndown",
-      "sha256": "fd0e2aa0785c13c39fa1ddc0b3b19520e541b69801c1369ea4aabfe7913a0dea",
+      "sha256": "/Q4qoHhcE8Ofod3As7GVIOVBtpgBwTaepKq/55E6Deo=",
+      "sha256_hex": "fd0e2aa0785c13c39fa1ddc0b3b19520e541b69801c1369ea4aabfe7913a0dea",
       "size": 10489,
       "purpose": "HTML → Markdown"
     },
@@ -38,7 +42,8 @@
       "version": "3.11.174",
       "source": "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js",
       "npm": "https://www.npmjs.com/package/pdfjs-dist",
-      "sha256": "5b5799e6f8c680663207ac5b42ee14eed2a406fa7af48f50c154f0c0b1566946",
+      "sha256": "W1eZ5vjGgGYyB6xbQu4U7tKkBvp69I9QwVTwwLFWaUY=",
+      "sha256_hex": "5b5799e6f8c680663207ac5b42ee14eed2a406fa7af48f50c154f0c0b1566946",
       "size": 320004,
       "purpose": "PDF text extraction"
     },
@@ -46,7 +51,8 @@
       "version": "3.11.174",
       "source": "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js",
       "npm": "https://www.npmjs.com/package/pdfjs-dist",
-      "sha256": "feabdf309770ed24bba31a5467836cdc8cf639c705af27d52b585b041bb8527b",
+      "sha256": "/qvfMJdw7SS7oxpUZ4Ns3Iz2OccFryfVK1hbBBu4Uns=",
+      "sha256_hex": "feabdf309770ed24bba31a5467836cdc8cf639c705af27d52b585b041bb8527b",
       "size": 1087212,
       "purpose": "PDF.js web worker"
     },
@@ -54,7 +60,8 @@
       "version": "5.4.1",
       "source": "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js",
       "npm": "https://www.npmjs.com/package/papaparse",
-      "sha256": "b8e870c5d2b29772f10c9fa9a693c8b896aac8540ed6701e3cc6304c683febdb",
+      "sha256": "uOhwxdKyl3LxDJ+pppPIuJaqyFQO1nAePMYwTGg/69s=",
+      "sha256_hex": "b8e870c5d2b29772f10c9fa9a693c8b896aac8540ed6701e3cc6304c683febdb",
       "size": 19469,
       "purpose": "CSV parsing + streaming"
     }
