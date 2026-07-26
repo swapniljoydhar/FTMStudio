@@ -377,7 +377,31 @@ textarea:focus { border-color: var(--accent); }
 
 .btn-remove:hover { color: var(--red); background: var(--accent-soft); }
 
-/* ── AI site pills ── */
+/* ── AI site categories ── */
+.section-hint {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: -6px;
+}
+
+.ai-categories {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.ai-cat-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+
 .pill-row {
   display: flex;
   flex-wrap: wrap;
@@ -387,7 +411,7 @@ textarea:focus { border-color: var(--accent); }
 .pill {
   font-size: 10px;
   font-weight: 450;
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 4px;
   background: var(--surface);
   color: var(--text-2);

@@ -26,7 +26,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const smartModeToggle = $('smart-mode');
   const whitelistSection = $('whitelist-section');
   const whitelistTextarea = $('whitelist-textarea');
-  const aiSitesList = $('ai-sites-list');
   const statusDot = $('status-dot');
   const statusLabel = $('status-label');
   const timerSlider = $('timer-slider');
@@ -63,14 +62,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // ── AI Sites list (display only) ──
-  const AI_HOSTS = ['chat.openai.com', 'chatgpt.com', 'claude.ai', 'gemini.google.com', 'bard.google.com', 'copilot.microsoft.com', 'chat.mistral.ai', 'huggingface.co', 'poe.com', 'perplexity.ai', 'you.com', 'chat.deepseek.com', 'kimi.moonshot.cn', 'tongyi.aliyun.com', 'chatglm.cn', 'doubao.com'];
-  AI_HOSTS.forEach(host => {
-    const pill = document.createElement('span');
-    pill.className = 'pill';
-    pill.textContent = host;
-    aiSitesList.appendChild(pill);
-  });
+  // ── AI Sites database (categorized) ──
+  const AI_CATEGORIES = {
+    'LLM Chatbots': ['chat.openai.com', 'chatgpt.com', 'claude.ai', 'gemini.google.com', 'copilot.microsoft.com', 'chat.deepseek.com', 'chat.mistral.ai', 'huggingface.co', 'poe.com', 'perplexity.ai', 'you.com', 'character.ai', 'meta.ai', 'pi.ai', 'chatglm.cn', 'tongyi.aliyun.com', 'kimi.moonshot.cn', 'doubao.com', 'yiyan.baidu.com'],
+    'AI Code': ['cursor.com', 'replit.com', 'codeium.com', 'tabnine.com', 'phind.com', 'blackbox.ai', 'devv.ai'],
+    'AI Image': ['midjourney.com', 'stability.ai', 'leonardo.ai', 'ideogram.ai', 'playground.ai', 'firefly.adobe.com', 'canva.com', 'deepai.org'],
+    'AI Video': ['runwayml.com', 'synthesia.io', 'pika.art', 'heygen.com', 'luma.ai', 'descript.com', 'd-id.com'],
+    'AI Audio': ['elevenlabs.io', 'play.ht', 'murf.ai', 'suno.com', 'udio.com', 'speechify.com', 'otter.ai'],
+    'AI Writing': ['jasper.ai', 'copy.ai', 'writesonic.com', 'grammarly.com', 'quillbot.com', 'wordtune.com', 'sudowrite.com'],
+    'AI Search': ['perplexity.ai', 'consensus.app', 'elicit.com', 'scite.ai', 'chatpdf.com'],
+    'AI Productivity': ['notion.so', 'gamma.app', 'tome.app', 'beautiful.ai', 'fireflies.ai', 'read.ai', 'gong.io'],
+  };
+
+  const aiCats = document.getElementById('ai-categories');
+  for (const [cat, hosts] of Object.entries(AI_CATEGORIES)) {
+    const div = document.createElement('div');
+    const label = document.createElement('div');
+    label.className = 'ai-cat-name';
+    label.textContent = cat;
+    div.appendChild(label);
+    const row = document.createElement('div');
+    row.className = 'pill-row';
+    hosts.forEach(h => {
+      const pill = document.createElement('span');
+      pill.className = 'pill';
+      pill.textContent = h;
+      row.appendChild(pill);
+    });
+    div.appendChild(row);
+    aiCats.appendChild(div);
+  }
 
   function updateSmartModeUI() {
     const smart = smartModeToggle.checked;

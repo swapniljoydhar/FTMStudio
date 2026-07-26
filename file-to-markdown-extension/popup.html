@@ -39,10 +39,13 @@
       </section>
 
       <section class="section" id="whitelist-section">
-        <h2 class="section-label">AI Sites (auto-detected)</h2>
-        <div class="pill-row" id="ai-sites-list"></div>
-        <h2 class="section-label" style="margin-top:8px">Additional Sites</h2>
-        <textarea id="whitelist-textarea" rows="2" placeholder="my-ai-app.com&#10;internal-tool.net"></textarea>
+        <h2 class="section-label">Custom Sites</h2>
+        <p class="section-hint">Add your own AI tools or sites. One domain per line.</p>
+        <textarea id="whitelist-textarea" rows="3" placeholder="my-ai-app.com&#10;internal-tool.company.net&#10;local-llm:8080"></textarea>
+        <details class="help">
+          <summary>Built-in AI sites (auto-detected)</summary>
+          <div class="ai-categories" id="ai-categories"></div>
+        </details>
       </section>
 
       <section class="section">
