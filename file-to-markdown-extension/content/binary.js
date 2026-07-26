@@ -14,6 +14,8 @@ FTM.decrementPending = function () {
 FTM.processBinaryFile = async function (file) {
   let port = null;
   let settled = false;
+  let pendingReject = null;
+  let timer = null;
 
   pendingConversions++;
 
@@ -47,37 +49,31 @@ FTM.processBinaryFile = async function (file) {
 
     port = chrome.runtime.connect({ name: 'ftm' });
 
-    // Handle port disconnect before result arrives
-    port.onDisconnect.addListener(() => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timer);
-        FTM.decrementPending();
-        // The promise will be rejected below via the timer path
-        // We need a way to signal the promise. Use a stored reject.
-        if (pendingReject) {
-          pendingReject(new Error('Port disconnected during conversion (service worker may have restarted)'));
-          pendingReject = null;
-        }
-      }
-    });
-
-    let pendingReject = null;
-    let timer = null;
-
     return await new Promise((resolve, reject) => {
       pendingReject = reject;
+
+      // Handle port disconnect before result arrives
+      port.onDisconnect.addListener(() => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          pendingReject = null;
+          FTM.decrementPending();
+          reject(new Error('Port disconnected during conversion (service worker may have restarted)'));
+        }
+      });
 
       timer = setTimeout(() => {
         if (!settled) {
           settled = true;
+          pendingReject = null;
           try { port.disconnect(); } catch (_) {}
           FTM.decrementPending();
-          pendingReject = null;
           reject(new Error('Offscreen processing timed out (60s)'));
         }
       }, FTM.CONSTANTS.CONVERSION_TIMEOUT_MS);
 
+      // CRITICAL FIX: Add message listener BEFORE postMessage to prevent race condition
       port.onMessage.addListener(function onMsg(msg) {
         if (settled) return;
         if (msg.type === 'PROCESS_RESULT' || msg.type === 'ERROR') {
@@ -94,6 +90,7 @@ FTM.processBinaryFile = async function (file) {
         }
       });
 
+      // Now safe to send message after listener is established
       port.postMessage(
         { type: 'PROCESS_BINARY_FILE', data: { fileName: file.name, extension: ext, arrayBuffer } },
         [arrayBuffer]

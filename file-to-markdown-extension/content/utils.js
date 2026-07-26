@@ -52,6 +52,7 @@ FTM.isBlacklisted = function () {
  * Smart Mode activation check.
  * - Smart Mode OFF: activate everywhere (unless blacklisted)
  * - Smart Mode ON: only activate on AI sites + user-whitelisted sites
+ * Uses Set-based lookup for O(1) domain matching instead of O(N) linear search
  */
 FTM.shouldActivate = function () {
   if (FTM.isBlacklisted()) return false;
@@ -60,6 +61,11 @@ FTM.shouldActivate = function () {
   try {
     const hostname = window.location.hostname.toLowerCase();
     let matched = false;
+
+    // Cache AI_HOSTS as a Set for O(1) lookup if not already cached
+    if (!FTM._aiHostsSet) {
+      FTM._aiHostsSet = new Set(FTM.AI_HOSTS.map(h => h.toLowerCase()));
+    }
 
     // Check user whitelist
     const wl = FTM.config.domainWhitelist;
@@ -71,11 +77,9 @@ FTM.shouldActivate = function () {
       }
     }
 
-    // Check built-in AI hosts
-    if (!matched) {
-      for (const ai of FTM.AI_HOSTS) {
-        if (hostname === ai || hostname.endsWith('.' + ai)) { matched = true; break; }
-      }
+    // Check built-in AI hosts using Set-based lookup
+    if (!matched && FTM._aiHostsSet.has(hostname)) {
+      matched = true;
     }
 
     // Check custom overrides (can add OR remove)

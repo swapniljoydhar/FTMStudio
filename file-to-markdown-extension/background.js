@@ -233,7 +233,12 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
           chrome.tabs.sendMessage(tab.id, {
             type: 'CONFIG_UPDATE',
             config: updatedConfig
-          }).catch(() => { /* Tab may not have content script */ });
+          }).catch((err) => { 
+            // Silently ignore - tab may not have content script or may be closed
+            if (process.env.NODE_ENV === 'development') {
+              console.debug('[FTM] Config sync failed for tab:', tab.id, err.message);
+            }
+          });
         }
       }
     });

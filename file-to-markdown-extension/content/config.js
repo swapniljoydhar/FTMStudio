@@ -7,6 +7,7 @@ window.FTM = window.FTM || {};
 FTM.config = {
   enabled: true,
   smartMode: true,
+  autoConvert: false, // New: automatically convert files without showing prompt
   autoDismissSeconds: FTM.CONSTANTS.TOAST_COUNTDOWN_DEFAULT_SEC,
   domainBlacklist: [],
   domainWhitelist: [],

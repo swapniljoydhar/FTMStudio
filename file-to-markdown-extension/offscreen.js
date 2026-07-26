@@ -40,7 +40,7 @@
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = src;
+      script.src = chrome.runtime.getURL(src);
       
       // Add Subresource Integrity hash if available
       const sriHash = SRI_HASHES[src];
