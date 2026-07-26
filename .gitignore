@@ -24,8 +24,10 @@ target/
 # Build artifacts
 dist/
 build/
-*.min.js
 *.bundle.js
+
+# Keep extension libraries (minified JS required for runtime)
+!file-to-markdown-extension/lib/*.min.js
 
 # Logs and temp files
 *.log

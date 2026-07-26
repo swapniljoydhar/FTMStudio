@@ -1,5 +1,5 @@
 // ===========================================================================
-// offscreen.js — Ephemeral Binary File Parser (v6)
+// offscreen.js — Ephemeral Binary File Parser (v1.0.1)
 // ===========================================================================
 //
 // EXECUTES INSIDE THE OFFSCREEN DOCUMENT.
@@ -11,7 +11,7 @@
 //   - .pptx   (JSZip → slide XML → Turndown.js → Markdown)
 //   - .pdf    (PDF.js → text extraction → structured Markdown)
 //
-// V6 CHANGES:
+// CHANGES:
 //   - Added PDF.js for PDF text extraction
 //   - Added PPTX support via JSZip (reuse existing library)
 //   - Simplified port: listens ONLY for 'ftm-offscreen-internal'
@@ -234,6 +234,12 @@
         if (!cf.content) continue;
         const parser = new DOMParser();
         const doc = parser.parseFromString(cf.content, 'application/xhtml+xml');
+        // Check for XML parse errors — parseFromString doesn't throw
+        const parseError = doc.querySelector('parsererror');
+        if (parseError) {
+          console.warn('[FTM] EPUB chapter XHTML parse error:', cf.path);
+          continue;
+        }
         const body = doc.body || doc.documentElement;
         if (!body) continue;
 
@@ -285,7 +291,12 @@
       const headers = jsonData[headerIdx];
       if (!headers || headers.length === 0) continue;
 
-      const headerCells = headers.map(h => String(h !== null && h !== undefined ? h : '').replace(/\|/g, '\\|'));
+      const sanitizeCell = (v) => {
+        const s = String(v !== null && v !== undefined ? v : '');
+        const safe = /^[=+\-@]/.test(s) ? "'" + s : s;
+        return safe.replace(/\|/g, '\\|');
+      };
+      const headerCells = headers.map(sanitizeCell);
       markdown += '| ' + headerCells.join(' | ') + ' |\n';
       markdown += '| ' + headerCells.map(() => '---').join(' | ') + ' |\n';
 
@@ -293,10 +304,7 @@
         const row = jsonData[i];
         if (!row) continue;
         while (row.length < headers.length) row.push('');
-        const cells = headers.map((_, colIdx) => {
-          const val = row[colIdx];
-          return String(val !== undefined && val !== null ? val : '').replace(/\|/g, '\\|');
-        });
+        const cells = headers.map((_, colIdx) => sanitizeCell(row[colIdx]));
         markdown += '| ' + cells.join(' | ') + ' |\n';
       }
       markdown += '\n';
@@ -317,13 +325,12 @@
   // rules and group consecutive short lines as paragraphs.
   // ---------------------------------------------------------------------------
 
+  // Worker path is set once in handleProcessRequest after library loads
+
   async function processPdf(arrayBuffer, fileName) {
     if (typeof pdfjsLib === 'undefined') {
       throw new Error('PDF.js library not loaded.');
     }
-
-    // Set worker source using correct Chrome extension URL format
-    pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.min.js');
 
     // Validate ArrayBuffer is not empty
     if (!arrayBuffer || arrayBuffer.byteLength === 0) {
@@ -402,11 +409,20 @@
         const line = lines[i];
         if (!line) continue;
 
-        // Detect potential headings: short title lines or ALL-CAPS headers
-        if (line.length < 70 && !line.endsWith('.') && !line.endsWith(',') && i + 1 < lines.length && lines[i + 1].length > 40) {
-          markdown += '## ' + line + '\n\n';
-        } else if (line.length < 50 && line === line.toUpperCase() && /[A-Z]/.test(line)) {
+        // Conservative heading detection:
+        // 1. ALL-CAPS lines under 40 chars with letters (e.g. "INTRODUCTION", "CHAPTER 1")
+        // 2. Short lines (<40 chars) that are title-cased, don't end with punctuation,
+        //    AND are followed by a blank line or much longer line
+        const isAllCaps = line.length < 40 && line === line.toUpperCase() && /[A-Z]{2,}/.test(line) && !/\d/.test(line);
+        const nextLine = i + 1 < lines.length ? lines[i + 1] : '';
+        const isTitleLike = line.length < 40 && !line.endsWith('.') && !line.endsWith(',') &&
+          !line.endsWith(':') && !line.endsWith(';') &&
+          /^[A-Z]/.test(line) && (nextLine === '' || nextLine.length > line.length * 2);
+
+        if (isAllCaps) {
           markdown += '### ' + line + '\n\n';
+        } else if (isTitleLike) {
+          markdown += '## ' + line + '\n\n';
         } else {
           markdown += line + '\n\n';
         }
@@ -447,29 +463,25 @@
       const parser = new DOMParser();
       const presDoc = parser.parseFromString(presXml, 'application/xml');
 
-      // Get slide references
+      // Get slide references — parse relationship file ONCE, cache in Map
       const slideRefs = presDoc.querySelectorAll('p\\:sldIdLst sldId, sldId');
       const slideFiles = [];
 
-      for (const sldRef of slideRefs) {
-        const rId = sldRef.getAttribute('r:id');
-        if (!rId) continue;
-
-        // Find relationship in presentation.xml.rels
-        const relsFile = zip.file('ppt/_rels/presentation.xml.rels');
-        if (!relsFile) continue;
-
+      const relsMap = new Map();
+      const relsFile = zip.file('ppt/_rels/presentation.xml.rels');
+      if (relsFile) {
         const relsXml = await relsFile.async('text');
         const relsDoc = parser.parseFromString(relsXml, 'application/xml');
-        const rels = relsDoc.querySelectorAll('Relationship');
-        let targetPath = null;
-        for (const rel of rels) {
-          if (rel.getAttribute('Id') === rId) {
-            targetPath = rel.getAttribute('Target');
-            break;
-          }
-        }
+        relsDoc.querySelectorAll('Relationship').forEach(rel => {
+          relsMap.set(rel.getAttribute('Id'), rel.getAttribute('Target'));
+        });
+      }
 
+      for (const sldRef of slideRefs) {
+        const rId = sldRef.getAttribute('r:id');
+        if (!rId || !relsMap.has(rId)) continue;
+
+        const targetPath = relsMap.get(rId);
         if (targetPath) {
           const fullPath = targetPath.startsWith('/') ? targetPath.substring(1) : 'ppt/' + targetPath;
           slideFiles.push(fullPath);
@@ -536,7 +548,7 @@
   // ---------------------------------------------------------------------------
   // 8. PORT MESSAGE HANDLER
   // ---------------------------------------------------------------------------
-  // V6: Listens ONLY for 'ftm-offscreen-internal' — no dual-name ambiguity.
+  // Listens ONLY for 'ftm-offscreen-internal' — no dual-name ambiguity.
   // ---------------------------------------------------------------------------
 
   chrome.runtime.onConnect.addListener((port) => {
@@ -600,6 +612,8 @@
       case '.pdf':
         if (typeof pdfjsLib === 'undefined') {
           await loadScript('lib/pdf.min.js');
+          // Set worker path once after library loads
+          pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.min.js');
         }
         markdown = await processPdf(arrayBuffer, fileName);
         break;
@@ -622,13 +636,12 @@
   });
 
   function performAggressiveCleanup() {
-    // Step 1: Nullify ALL global library references
+    // Step 1: Nullify ALL global library references (may be read-only in some contexts)
     if (typeof window !== 'undefined') {
-      window.mammoth = null;
-      window.XLSX = null;
-      window.JSZip = null;
-      window.TurndownService = null;
-      window.pdfjsLib = null;
+      const globals = ['mammoth', 'XLSX', 'JSZip', 'TurndownService', 'pdfjsLib'];
+      for (const name of globals) {
+        try { window[name] = null; } catch (_) { /* read-only — ignore */ }
+      }
     }
 
     // Step 2: Remove ALL dynamically loaded script tags

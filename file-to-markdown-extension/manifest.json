@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "File to Markdown Converter",
-  "version": "6.5.0",
+  "version": "1.0.1",
   "description": "Automatically detects and intercepts file uploads, converting documents to high-fidelity Markdown. All processing happens 100% locally.",
   "permissions": [
     "storage",

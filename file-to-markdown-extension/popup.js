@@ -1,5 +1,5 @@
 // ===========================================================================
-// popup.js — Configuration Dashboard Logic (v6.5)
+// popup.js — Configuration Dashboard Logic (v1.0.1)
 // ===========================================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -35,6 +35,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   const historyList = document.getElementById('history-list');
   const btnExportHistory = document.getElementById('btn-export-history');
   const btnClearHistory = document.getElementById('btn-clear-history');
+
+  // ─── DYNAMIC VERSION BADGE ───
+  const versionBadge = document.getElementById('version-badge');
+  if (versionBadge) {
+    try {
+      const manifest = chrome.runtime.getManifest();
+      versionBadge.textContent = 'v' + manifest.version;
+    } catch (_) {
+      versionBadge.textContent = 'v1.0.1';
+    }
+  }
 
   // ─── TAB NAVIGATION ───
   document.querySelectorAll('.tab').forEach(tab => {
@@ -383,14 +394,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     saveConfig({ conversionHistory: [] });
     renderHistory();
   });
-
-  function escapeHtml(str) {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
-  function escapeAttr(str) {
-    return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  }
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local') {

@@ -1,12 +1,12 @@
 // ===========================================================================
-// content.js — File-to-Markdown Interceptor (Content Script, v6)
+// content.js — File-to-Markdown Interceptor (Content Script, v1.0.1)
 // ===========================================================================
 //
 // CAPTURE-PHASE EVENT INTERCEPTION — fires BEFORE React/Vue/Svelte.
 // Shadow DOM toast with closed encapsulation. DataTransfer API for FileList.
 // Transferable Objects for zero-copy ArrayBuffer to offscreen document.
 //
-// V6 FEATURES:
+// FEATURES:
 //   - PDF support via PDF.js (lazy-loaded in offscreen)
 //   - PPTX support via JSZip (lazy-loaded in offscreen)
 //   - Fixed port name: content uses 'ftm', background bridges to 'ftm-offscreen-internal'
@@ -129,8 +129,10 @@
       const hostname = window.location.hostname;
       if (config.domainBlacklist && config.domainBlacklist.length > 0) {
         for (const domain of config.domainBlacklist) {
-          const trimmed = domain.trim();
-          if (trimmed && hostname.includes(trimmed)) return true;
+          const trimmed = domain.trim().toLowerCase();
+          if (!trimmed) continue;
+          // Exact match or suffix match (e.g. "example.com" matches "sub.example.com")
+          if (hostname === trimmed || hostname.endsWith('.' + trimmed)) return true;
         }
       }
     } catch (e) { /* cross-origin — ignore */ }
@@ -467,7 +469,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 9. RE-DISPATCH — DataTransfer API on exact EventTarget (v6)
+  // 9. RE-DISPATCH — DataTransfer API on exact EventTarget (v1.0.1)
   // ---------------------------------------------------------------------------
   function reDispatchEvent(file) {
     isReDispatching = true;
@@ -544,20 +546,46 @@
   // ---------------------------------------------------------------------------
   // 10. HEURISTIC CONTENT SNIFFING — "Trust, But Verify"
   // ---------------------------------------------------------------------------
+
+  // Magic byte signatures for known binary formats
+  const MAGIC_SIGNATURES = [
+    { bytes: [0x50, 0x4B, 0x03, 0x04], name: 'ZIP/DOCX/XLSX/PPTX/EPUB' },
+    { bytes: [0x25, 0x50, 0x44, 0x46], name: 'PDF' },
+    { bytes: [0xD0, 0xCF, 0x11, 0xE0], name: 'OLE2 (legacy DOC/XLS)' },
+    { bytes: [0x7B, 0x5C, 0x72, 0x74, 0x66], name: 'RTF' },
+    { bytes: [0x1F, 0x8B], name: 'GZIP' },
+    { bytes: [0x42, 0x5A, 0x68], name: 'BZIP2' },
+  ];
+
   function sniffFileContent(file) {
     return new Promise((resolve, reject) => {
-      const slice = file.slice(0, 100);
+      const slice = file.slice(0, 128);
       const reader = new FileReader();
 
       reader.onload = () => {
         const bytes = new Uint8Array(reader.result);
+
+        // Check magic bytes first — fast and reliable
+        for (const sig of MAGIC_SIGNATURES) {
+          if (bytes.length >= sig.bytes.length) {
+            const match = sig.bytes.every((b, i) => bytes[i] === b);
+            if (match) {
+              reject(new Error(
+                `Content sniffing detected ${sig.name} signature in "${file.name}". Aborted.`
+              ));
+              return;
+            }
+          }
+        }
+
+        // Fallback: count null bytes (heuristic for unknown binary formats)
         const nullBytes = Array.from(bytes).filter(b => b === 0x00).length;
         const isBinary = nullBytes > 3;
 
         if (isBinary) {
           reject(new Error(
             `Content sniffing detected binary data in "${file.name}" ` +
-            `(${nullBytes} null bytes in first 100 bytes). Aborted.`
+            `(${nullBytes} null bytes in first 128 bytes). Aborted.`
           ));
         } else {
           resolve(bytes);
@@ -572,17 +600,23 @@
   async function processTextFile(file, ext) {
     const fileName = file.name;
 
+    // Enforce size limit before reading — prevents OOM on large text files
+    if (file.size > CONSTANTS.MAX_TEXT_READ_SIZE_BYTES) {
+      throw new Error(
+        `File "${fileName}" is too large (${formatBytes(file.size)}). Maximum text file size is ${formatBytes(CONSTANTS.MAX_TEXT_READ_SIZE_BYTES)}.`
+      );
+    }
+
     // Skip content sniffing for tiny files (< 1KB) — overhead not worth it
     if (file.size > CONSTANTS.SNIFF_THRESHOLD_BYTES) {
       try {
         await sniffFileContent(file);
       } catch (err) {
         console.warn('[FTM]', err.message);
-        if (file.size > CONSTANTS.MAX_TEXT_READ_SIZE_BYTES) {
-          throw new Error(
-            `File "${fileName}" appears binary and is too large (${formatBytes(file.size)}) to safely read as text.`
-          );
-        }
+        // Binary file detected — reject
+        throw new Error(
+          `File "${fileName}" appears to be binary. Cannot process as text.`
+        );
       }
     }
 
@@ -650,8 +684,9 @@
             if (rowCount >= CONSTANTS.MAX_CSV_ROWS) return;
 
             const cells = row.map(c => {
-              const val = String(c !== null && c !== undefined ? c : '').replace(/\|/g, '\\|');
-              return val.replace(/\n/g, ' ');
+              const raw = String(c !== null && c !== undefined ? c : '');
+              const sanitized = /^[=+\-@]/.test(raw) ? "'" + raw : raw;
+              return sanitized.replace(/\|/g, '\\|').replace(/\n/g, ' ');
             });
 
             if (cells.length > maxCols) maxCols = cells.length;
@@ -718,14 +753,28 @@
       const result = Papa.parse(text, { skipEmptyLines: true });
       const rows = result.data;
       if (rows.length === 0) return '# CSV Data\n\n```\n' + text + '\n```';
-      return buildMarkdownTable(rows, '# CSV Data');
+      return buildMarkdownTable(rows.map(r => r.map(sanitizeCsvCell)), '# CSV Data');
     }
 
     // Fallback
     const lines = text.trim().split(/\r?\n/);
     if (lines.length === 0) return '# CSV Data\n\n```\n' + text + '\n```';
-    const rows = lines.filter(l => l.trim()).map(line => parseCsvLine(line));
+    const rows = lines.filter(l => l.trim()).map(line => parseCsvLine(line).map(sanitizeCsvCell));
     return buildMarkdownTable(rows, '# CSV Data');
+  }
+
+  /**
+   * Sanitize a CSV cell to prevent formula injection when the Markdown
+   * output is pasted into a spreadsheet application.
+   * Prefixes dangerous characters with a single quote.
+   */
+  function sanitizeCsvCell(value) {
+    if (typeof value !== 'string') value = String(value ?? '');
+    // Cells starting with =, +, -, @ can be interpreted as formulas
+    if (/^[=+\-@]/.test(value)) {
+      return "'" + value;
+    }
+    return value;
   }
 
   function parseCsvLine(line) {
@@ -823,7 +872,7 @@
   // ===========================================================================
   // BINARY FILE PROCESSING — Transferable Objects (Zero-Copy)
   // ===========================================================================
-  // V6 FIX: Port name is 'ftm' (not 'ftm-offscreen'). Background bridges
+  // Port name is 'ftm' (not 'ftm-offscreen'). Background bridges
   // to 'ftm-offscreen-internal' on the offscreen document.
   // FIX C3: Added reference counting for concurrent conversions to prevent
   // race conditions during rapid file processing.
@@ -832,54 +881,69 @@
   // Reference counter for concurrent conversions
   let pendingConversions = 0;
 
-  function processBinaryFile(file) {
-    return new Promise(async (resolve, reject) => {
-      let port = null;
-      let resolved = false;
-      const conversionId = ++pendingConversions;
+  /**
+   * Decrement the pending conversion counter safely (never goes below 0).
+   * Returns true if this was the last pending conversion.
+   */
+  function decrementPending() {
+    pendingConversions = Math.max(0, pendingConversions - 1);
+    return pendingConversions <= 0;
+  }
 
-      try {
-        const ext = getExtension(file.name).toLowerCase();
+  async function processBinaryFile(file) {
+    let port = null;
+    let settled = false; // Prevents double-resolution
 
-        // File size validation (50MB max)
-        if (file.size > CONSTANTS.MAX_FILE_SIZE_BYTES) {
-          throw new Error('File too large: ' + formatBytes(file.size) + '. Maximum supported size is 50MB.');
-        }
+    pendingConversions++;
 
-        // Step 1: Ensure offscreen document exists
-        await new Promise((res, rej) => {
-          chrome.runtime.sendMessage({ type: 'CREATE_OFFSCREEN' }, (response) => {
-            if (chrome.runtime.lastError) rej(new Error(chrome.runtime.lastError.message));
-            else res(response);
-          });
+    try {
+      const ext = getExtension(file.name).toLowerCase();
+
+      // File size validation (50MB max)
+      if (file.size > CONSTANTS.MAX_FILE_SIZE_BYTES) {
+        throw new Error('File too large: ' + formatBytes(file.size) + '. Maximum supported size is 50MB.');
+      }
+
+      // Step 1: Ensure offscreen document exists
+      await new Promise((res, rej) => {
+        chrome.runtime.sendMessage({ type: 'CREATE_OFFSCREEN' }, (response) => {
+          if (chrome.runtime.lastError) rej(new Error(chrome.runtime.lastError.message));
+          else res(response);
         });
+      });
 
-        // Step 2: Read file as ArrayBuffer
-        const arrayBuffer = await file.arrayBuffer();
+      // Step 2: Read file as ArrayBuffer
+      const arrayBuffer = await file.arrayBuffer();
 
-        // Step 3: V6 FIX — Connect with port name 'ftm'
-        port = chrome.runtime.connect({ name: 'ftm' });
+      // Step 3: Connect with port name 'ftm'
+      port = chrome.runtime.connect({ name: 'ftm' });
 
-        // Step 4: Multi-message listener (persists until response or error)
+      // Step 4: Return a Promise that resolves when the offscreen responds
+      return await new Promise((resolve, reject) => {
+        // Safety timeout (60s)
+        const timer = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            try { port.disconnect(); } catch (_) {}
+            decrementPending();
+            reject(new Error('Offscreen processing timed out (60s)'));
+          }
+        }, CONSTANTS.CONVERSION_TIMEOUT_MS);
+
         port.onMessage.addListener(function onPortMessage(msg) {
-          if (msg.type === 'PROCESS_RESULT') {
-            resolved = true;
+          if (settled) return;
+
+          if (msg.type === 'PROCESS_RESULT' || msg.type === 'ERROR') {
+            settled = true;
+            clearTimeout(timer);
+            // Just disconnect — background.js closes offscreen on last port disconnect
             try { port.disconnect(); } catch (_) {}
-            port = null;
-            // Only close offscreen if this is the last pending conversion
-            if (--pendingConversions <= 0) {
-              chrome.runtime.sendMessage({ type: 'CLOSE_OFFSCREEN' });
+            decrementPending();
+            if (msg.type === 'ERROR' || (msg.data && msg.data.error)) {
+              reject(new Error(msg.data ? msg.data.error : 'Unknown offscreen error'));
+            } else {
+              resolve(msg.data.markdown || '');
             }
-            if (msg.data && msg.data.error) reject(new Error(msg.data.error));
-            else resolve(msg.data.markdown || '');
-          } else if (msg.type === 'ERROR') {
-            resolved = true;
-            try { port.disconnect(); } catch (_) {}
-            port = null;
-            if (--pendingConversions <= 0) {
-              chrome.runtime.sendMessage({ type: 'CLOSE_OFFSCREEN' });
-            }
-            reject(new Error(msg.data ? msg.data.error : 'Unknown offscreen error'));
           }
         });
 
@@ -888,28 +952,16 @@
           { type: 'PROCESS_BINARY_FILE', data: { fileName: file.name, extension: ext, arrayBuffer } },
           [arrayBuffer]
         );
+      });
 
-        // Safety timeout (60s)
-        setTimeout(() => {
-          if (port && !resolved) {
-            resolved = true;
-            try { port.disconnect(); } catch (_) {}
-            port = null;
-            if (--pendingConversions <= 0) {
-              chrome.runtime.sendMessage({ type: 'CLOSE_OFFSCREEN' });
-            }
-            reject(new Error('Offscreen processing timed out (60s)'));
-          }
-        }, CONSTANTS.CONVERSION_TIMEOUT_MS);
-
-      } catch (err) {
-        if (port) { try { port.disconnect(); } catch (_) {} port = null; }
-        if (--pendingConversions <= 0) {
-          try { chrome.runtime.sendMessage({ type: 'CLOSE_OFFSCREEN' }); } catch (_) {}
-        }
-        reject(err);
+    } catch (err) {
+      if (!settled) {
+        settled = true;
+        if (port) { try { port.disconnect(); } catch (_) {} }
+        decrementPending();
       }
-    });
+      throw err;
+    }
   }
 
   // ===========================================================================
@@ -945,9 +997,14 @@
     return str
       .replace(/\\/g, '\\\\')
       .replace(/"/g, '\\"')
+      .replace(/:/g, '\\:')
       .replace(/\n/g, '\\n')
       .replace(/\r/g, '\\r')
-      .replace(/\t/g, '\\t');
+      .replace(/\t/g, '\\t')
+      .replace(/\[/g, '\\[')
+      .replace(/\]/g, '\\]')
+      .replace(/\{/g, '\\{')
+      .replace(/\}/g, '\\}');
   }
 
   // ---------------------------------------------------------------------------
@@ -970,32 +1027,22 @@
     }
 
     if (config.regexPipeline && config.regexPipeline.length > 0) {
+      // Guard against excessively large text — regex on huge strings is slow
+      const MAX_REGEX_TEXT_LENGTH = 2 * 1024 * 1024; // 2MB
+      if (text.length > MAX_REGEX_TEXT_LENGTH) {
+        console.warn('[FTM] Text too long for regex pipeline (' + text.length + ' chars). Skipping.');
+        return text;
+      }
+
       for (const rule of config.regexPipeline) {
         if (!rule || !rule.enabled) continue;
         if (!rule.pattern) continue;
         
         try {
-          // Basic ReDoS pattern detection
-          const unsafePatterns = [
-            /(.*?){3,}/,           // Nested quantifiers
-            /(\w*?)+/,             // Quantified groups
-            /(a|aa)+/,             // Overlapping alternation in quantified group
-            /^(\s+)*$/,            // Quantified anchors
-            /([a-z]+)+/i,          // Letter class with quantifier
-            /(\d+)+/,              // Digit class with quantifier
-            /(.*?){2,}.*?/,        // Multiple lazy quantifiers
-          ];
-          
-          let isUnsafe = false;
-          for (const unsafe of unsafePatterns) {
-            if (unsafe.test(rule.pattern)) {
-              console.warn('[FTM] Regex pattern may cause ReDoS:', rule.pattern);
-              isUnsafe = true;
-              break;
-            }
+          if (!isRegexSafe(rule.pattern)) {
+            console.warn('[FTM] Regex pattern rejected (potential ReDoS):', rule.pattern);
+            continue;
           }
-          
-          if (isUnsafe) continue;
           
           const regex = new RegExp(rule.pattern, rule.flags || 'g');
           text = text.replace(regex, rule.replacement || '');
@@ -1008,10 +1055,43 @@
     return text;
   }
 
+  /**
+   * ReDoS safety check — tests the compiled regex against a known-vulnerable
+   * test string with a timeout. Rejects patterns that cause excessive
+   * backtracking (>50ms on a short string = likely exponential).
+   */
+  function isRegexSafe(pattern) {
+    try {
+      const regex = new RegExp(pattern, 'g');
+      // Test string designed to trigger catastrophic backtracking in common
+      // vulnerable patterns: nested quantifiers, overlapping alternations
+      const testStr = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!';
+      const start = performance.now();
+      regex.test(testStr);
+      const elapsed = performance.now() - start;
+      // If a 30-char string takes >50ms, the pattern is likely exponential
+      if (elapsed > 50) return false;
+      // Also test with a second variant for alternation-based patterns
+      const testStr2 = 'a'.repeat(25) + 'b';
+      const start2 = performance.now();
+      regex.test(testStr2);
+      const elapsed2 = performance.now() - start2;
+      if (elapsed2 > 50) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   function enforceHeadingHierarchy(text) {
-    const headingLines = text.match(/^#{1,6}\s/m);
-    if (!headingLines) return text;
-    const minLevel = headingLines[0].match(/^#+/)[0].length;
+    // Find the minimum heading level across ALL headings in the document
+    const allHeadings = text.match(/^(#{1,6})\s/gm);
+    if (!allHeadings || allHeadings.length === 0) return text;
+    let minLevel = 6;
+    for (const h of allHeadings) {
+      const level = h.match(/^#+/)[0].length;
+      if (level < minLevel) minLevel = level;
+    }
     if (minLevel === 1) return text;
     const shift = minLevel - 1;
     return text.replace(/^(#{1,6})\s/gm, (match, hashes) => {
@@ -1035,8 +1115,10 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 17. CONVERSION HISTORY (persisted to chrome.storage.local)
+  // 17. CONVERSION HISTORY (persisted to chrome.storage.local, debounced)
   // ---------------------------------------------------------------------------
+  let historyPersistTimer = null;
+
   function recordConversion(fileName, fileSize, extension) {
     conversionHistory.push({
       file: fileName,
@@ -1050,9 +1132,12 @@
       conversionHistory.shift();
     }
 
-    chrome.storage.local.set({
-      conversionHistory: [...conversionHistory]
-    });
+    // Debounce storage writes — batch rapid conversions into a single write
+    if (historyPersistTimer) clearTimeout(historyPersistTimer);
+    historyPersistTimer = setTimeout(() => {
+      chrome.storage.local.set({ conversionHistory: [...conversionHistory] });
+      historyPersistTimer = null;
+    }, 2000);
   }
 
   // ---------------------------------------------------------------------------
@@ -1123,7 +1208,6 @@
 
   function registerListeners() {
     document.addEventListener('drop', handleDropCapture, true);
-    document.addEventListener('dragover', () => { /* no preventDefault */ }, true);
     document.addEventListener('change', handleFileInputChange, true);
     document.addEventListener('keydown', onKeydown, true);
   }
@@ -1177,7 +1261,7 @@
     await loadConfig();
     if (!config.enabled) return;
     registerListeners();
-    console.log('[FTM] File-to-Markdown converter initialized (v6)');
+    console.log('[FTM] File-to-Markdown converter initialized (v1.0.1)');
   }
 
   init();
