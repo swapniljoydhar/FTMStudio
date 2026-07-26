@@ -28,13 +28,13 @@
 
   // SRI Hashes for library integrity verification
   const SRI_HASHES = {
-    'lib/mammoth.browser.min.js': 'sha256-596ef52239e52d8ee3cee10b2ee4a72596abf900d0e4f468593f956e9f1809b0',
-    'lib/xlsx.mini.min.js': 'sha256-3120abba1fd0ea031f25ab22ac93e726f6f63467da1a6349b82e82f3df5d775c',
-    'lib/jszip.min.js': 'sha256-acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e',
-    'lib/turndown.min.js': 'sha256-fd0e2aa0785c13c39fa1ddc0b3b19520e541b69801c1369ea4aabfe7913a0dea',
-    'lib/pdf.min.js': 'sha256-5b5799e6f8c680663207ac5b42ee14eed2a406fa7af48f50c154f0c0b1566946',
-    'lib/pdf.worker.min.js': 'sha256-feabdf309770ed24bba31a5467836cdc8cf639c705af27d52b585b041bb8527b',
-    'lib/papaparse.min.js': 'sha256-b8e870c5d2b29772f10c9fa9a693c8b896aac8540ed6701e3cc6304c683febdb'
+    'lib/mammoth.browser.min.js': 'sha256-WW71IjnlLY7jzuELLuSnJZar+QDQ5PRoWT+Vbp8YCbA=',
+    'lib/xlsx.mini.min.js': 'sha256-MSCruh/Q6gMfJasirJPnJvb2NGfaGmNJuC6C899dd1w=',
+    'lib/jszip.min.js': 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=',
+    'lib/turndown.min.js': 'sha256-/Q4qoHhcE8Ofod3As7GVIOVBtpgBwTaepKq/55E6Deo=',
+    'lib/pdf.min.js': 'sha256-W1eZ5vjGgGYyB6xbQu4U7tKkBvp69I9QwVTwwLFWaUY=',
+    'lib/pdf.worker.min.js': 'sha256-/qvfMJdw7SS7oxpUZ4Ns3Iz2OccFryfVK1hbBBu4Uns=',
+    'lib/papaparse.min.js': 'sha256-uOhwxdKyl3LxDJ+pppPIuJaqyFQO1nAePMYwTGg/69s='
   };
 
   function loadScript(src) {
@@ -87,7 +87,7 @@
       emDelimiter: '_'
     });
 
-    // Table support rule
+    // Table support rule — uses recursive turndown for cell formatting
     turndown.addRule('tables', {
       filter: 'table',
       replacement: function(content, node) {
@@ -98,7 +98,11 @@
         for (const tr of trs) {
           const cells = [];
           const tds = tr.querySelectorAll('th, td');
-          for (const td of tds) cells.push(td.textContent.trim());
+          for (const td of tds) {
+            // Use recursive turndown to preserve bold/italic/links in cells
+            const cellHtml = td.innerHTML || td.textContent || '';
+            cells.push(cellHtml.trim() ? turndown.turndown(cellHtml).trim() : '');
+          }
           if (cells.length > 0) rows.push(cells);
         }
         if (rows.length === 0) return '';
@@ -106,7 +110,7 @@
         const maxCols = Math.max(...rows.map(r => r.length));
         const normalized = rows.map(r => {
           while (r.length < maxCols) r.push('');
-          return r.map(c => String(c).replace(/\|/g, '\\|').replace(/\n/g, ' '));
+          return r.map(c => String(c).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' '));
         });
 
         const header = '| ' + normalized[0].join(' | ') + ' |';
@@ -143,12 +147,11 @@
     const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer }, options);
     const html = result.value || '';
 
-    // Strip any remaining img tags
-    const cleanHtml = html.replace(/<img\s+[^>]*>/gi, '');
+    // Strip img src attributes but keep alt text as placeholder
+    const cleanHtml = html.replace(/<img\s+[^>]*alt="([^"]*)"[^>]*>/gi, '$1');
 
     const turndown = createTurndown();
     let markdown = turndown.turndown(cleanHtml);
-    markdown = markdown.replace(/!\[.*?\]\(.*?\)/g, '');
     markdown = markdown.replace(/\n{3,}/g, '\n\n').trim();
 
     return '# ' + fileName.replace(/\.[^.]+$/, '') + '\n\n' + markdown;
@@ -294,7 +297,7 @@
       const sanitizeCell = (v) => {
         const s = String(v !== null && v !== undefined ? v : '');
         const safe = /^[=+\-@]/.test(s) ? "'" + s : s;
-        return safe.replace(/\|/g, '\\|');
+        return safe.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
       };
       const headerCells = headers.map(sanitizeCell);
       markdown += '| ' + headerCells.join(' | ') + ' |\n';
