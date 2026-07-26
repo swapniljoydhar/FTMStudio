@@ -285,51 +285,52 @@
       :host { all: initial; display: block; }
       *, *::before, *::after { box-sizing: border-box; }
       .ftm-toast {
-        font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
-        width: 340px;
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 16px;
-        color: #111827;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+        width: 320px;
+        background: #fff;
+        border: 1px solid #e8e8ec;
+        border-radius: 10px;
+        padding: 14px;
+        color: #1a1a1e;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
         user-select: none;
       }
       @media (prefers-color-scheme: dark) {
         .ftm-toast {
-          background: #1e293b;
-          border-color: #334155;
-          color: #f1f5f9;
-          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+          background: #1a1a1e;
+          border-color: #2a2a2e;
+          color: #ededf0;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
         }
       }
-      .ftm-toast-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-      .ftm-icon { width: 20px; height: 20px; color: #2563eb; flex-shrink: 0; }
-      .ftm-toast-title { font-size: 14px; font-weight: 600; color: #111827; }
+      .ftm-toast-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+      .ftm-icon { width: 16px; height: 16px; color: #4f6ef7; flex-shrink: 0; }
+      .ftm-toast-title { font-size: 13px; font-weight: 600; color: #1a1a1e; letter-spacing: -0.01em; }
       @media (prefers-color-scheme: dark) {
-        .ftm-toast-title { color: #f1f5f9; }
+        .ftm-toast-title { color: #ededf0; }
       }
-      .ftm-toast-body { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-      .ftm-toast-filename { font-size: 12px; font-weight: 500; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f9fafb; padding: 6px 10px; border-radius: 6px; border: 1px solid #e5e7eb; }
+      .ftm-toast-body { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+      .ftm-toast-filename { font-size: 11px; font-weight: 450; color: #6b6b76; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f7f7f8; padding: 5px 8px; border-radius: 6px; border: 1px solid #e8e8ec; font-family: 'SF Mono', monospace; }
       @media (prefers-color-scheme: dark) {
-        .ftm-toast-filename { background: #0f172a; border-color: #334155; color: #94a3b8; }
+        .ftm-toast-filename { background: #111113; border-color: #2a2a2e; color: #8e8e9a; }
       }
-      .ftm-toast-hint { font-size: 10px; color: #9ca3af; display: flex; align-items: center; gap: 6px; }
-      .ftm-toast-progress { height: 3px; background: #e5e7eb; border-radius: 2px; overflow: hidden; position: relative; margin-bottom: 14px; }
+      .ftm-toast-hint { font-size: 10px; color: #9d9da8; }
+      .ftm-toast-progress { height: 2px; background: #e8e8ec; border-radius: 1px; overflow: hidden; position: relative; margin-bottom: 12px; }
       @media (prefers-color-scheme: dark) {
-        .ftm-toast-progress { background: #334155; }
+        .ftm-toast-progress { background: #2a2a2e; }
       }
-      .ftm-toast-progress-bar { height: 100%; width: 100%; background: #2563eb; border-radius: 2px; transition: width 0.1s linear; transform-origin: left; }
-      .ftm-toast-timer { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 9px; color: #2563eb; font-weight: 600; }
-      .ftm-toast-actions { display: flex; gap: 8px; justify-content: flex-end; }
-      .ftm-btn { font-family: inherit; font-size: 12px; font-weight: 500; padding: 7px 14px; border-radius: 6px; border: none; cursor: pointer; transition: all 0.15s; outline: none; }
-      .ftm-btn-approve { background: #2563eb; color: #ffffff; }
-      .ftm-btn-approve:hover { background: #1d4ed8; }
-      .ftm-btn-deny { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
-      .ftm-btn-deny:hover { background: #e5e7eb; }
+      .ftm-toast-progress-bar { height: 100%; width: 100%; background: #4f6ef7; border-radius: 1px; transition: width 0.1s linear; transform-origin: left; }
+      .ftm-toast-timer { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 9px; color: #4f6ef7; font-weight: 500; }
+      .ftm-toast-actions { display: flex; gap: 6px; justify-content: flex-end; }
+      .ftm-btn { font-family: inherit; font-size: 12px; font-weight: 500; padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; transition: all 0.15s; outline: none; }
+      .ftm-btn-approve { background: #1a1a1e; color: #fff; }
+      .ftm-btn-approve:hover { opacity: 0.85; }
+      .ftm-btn-deny { background: transparent; color: #6b6b76; }
+      .ftm-btn-deny:hover { color: #1a1a1e; }
       @media (prefers-color-scheme: dark) {
-        .ftm-btn-deny { background: #334155; color: #e2e8f0; border-color: #475569; }
-        .ftm-btn-deny:hover { background: #475569; }
+        .ftm-btn-approve { background: #ededf0; color: #111113; }
+        .ftm-btn-deny { color: #8e8e9a; }
+        .ftm-btn-deny:hover { color: #ededf0; }
       }
     `;
   }
