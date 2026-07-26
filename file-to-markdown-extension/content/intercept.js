@@ -250,5 +250,5 @@ document.addEventListener('visibilitychange', () => {
   document.addEventListener('drop', handleDropCapture, true);
   document.addEventListener('change', handleFileInputChange, true);
   document.addEventListener('keydown', onKeydown, true);
-  console.log('[FTM] Initialized (v1.0.1)', autoConvertMode ? '(Auto-convert enabled)' : '');
+  console.log('[FTM] Initialized (v2.0)', autoConvertMode ? '(Auto-convert enabled)' : '');
 })();

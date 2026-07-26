@@ -1,14 +1,15 @@
 // ===========================================================================
-// popup.js — Configuration Dashboard Logic (v1.0.1)
+// popup.js — FTM Studio v2.0 Configuration Dashboard
+// Elegant, minimal UI with collapsible sections
 // ===========================================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
   let currentConfig = {};
-  // Default configuration — keep in sync with background.js DEFAULT_CONFIG
+  
   const DEFAULT_CONFIG = {
     enabled: true,
     smartMode: true,
-    autoConvert: false, // New: automatically convert files without showing prompt
+    autoConvert: false,
     autoDismissSeconds: 10,
     domainBlacklist: [],
     domainWhitelist: [],
@@ -28,12 +29,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const masterToggle = $('master-toggle');
   const smartModeToggle = $('smart-mode');
   const autoConvertToggle = $('auto-convert');
-  const whitelistSection = $('whitelist-section');
-  const whitelistTextarea = $('whitelist-textarea');
   const statusDot = $('status-dot');
   const statusLabel = $('status-label');
-  const timerSlider = $('timer-slider');
-  const timerValue = $('timer-value');
   const blacklistTextarea = $('blacklist-textarea');
   const yamlToggle = $('yaml-toggle');
   const csvSlider = $('csv-threshold-slider');
@@ -45,14 +42,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const historyList = $('history-list');
   const btnExportHistory = $('btn-export-history');
   const btnClearHistory = $('btn-clear-history');
+  const versionBadge = $('version-badge');
 
   // ── Version badge ──
-  const versionBadge = $('version-badge');
   if (versionBadge) {
     try {
       versionBadge.textContent = 'v' + chrome.runtime.getManifest().version;
     } catch (_) {
-      versionBadge.textContent = 'v1.0.1';
+      versionBadge.textContent = 'v2.0';
     }
   }
 
@@ -66,23 +63,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // ── AI Sites database (categorized, editable) ──
+  // ── Collapsible Cards ──
+  document.querySelectorAll('.card-header').forEach(header => {
+    header.addEventListener('click', () => {
+      const card = header.closest('.collapsible');
+      const contentId = header.dataset.target;
+      const content = $(contentId);
+      
+      card.classList.toggle('expanded');
+      if (card.classList.contains('expanded')) {
+        content.style.display = 'block';
+      } else {
+        content.style.display = 'none';
+      }
+    });
+  });
+
+  // ── AI Sites database ──
   const AI_CATEGORIES = {
-    'LLM Chatbots': ['chat.openai.com', 'chatgpt.com', 'claude.ai', 'gemini.google.com', 'copilot.microsoft.com', 'chat.deepseek.com', 'chat.mistral.ai', 'huggingface.co', 'poe.com', 'perplexity.ai', 'you.com', 'character.ai', 'meta.ai', 'pi.ai', 'chatglm.cn', 'tongyi.aliyun.com', 'kimi.moonshot.cn', 'doubao.com', 'yiyan.baidu.com'],
+    'LLM Chatbots': ['chat.openai.com', 'chatgpt.com', 'claude.ai', 'gemini.google.com', 'copilot.microsoft.com', 'chat.deepseek.com', 'chat.mistral.ai', 'huggingface.co', 'poe.com', 'perplexity.ai', 'you.com', 'character.ai', 'meta.ai', 'pi.ai'],
     'AI Code': ['cursor.com', 'replit.com', 'codeium.com', 'tabnine.com', 'phind.com', 'blackbox.ai', 'devv.ai'],
-    'AI Image': ['midjourney.com', 'stability.ai', 'leonardo.ai', 'ideogram.ai', 'playground.ai', 'firefly.adobe.com', 'canva.com', 'deepai.org'],
-    'AI Video': ['runwayml.com', 'synthesia.io', 'pika.art', 'heygen.com', 'luma.ai', 'descript.com', 'd-id.com'],
-    'AI Audio': ['elevenlabs.io', 'play.ht', 'murf.ai', 'suno.com', 'udio.com', 'speechify.com', 'otter.ai'],
-    'AI Writing': ['jasper.ai', 'copy.ai', 'writesonic.com', 'grammarly.com', 'quillbot.com', 'wordtune.com', 'sudowrite.com'],
-    'AI Search': ['perplexity.ai', 'consensus.app', 'elicit.com', 'scite.ai', 'chatpdf.com'],
-    'AI Productivity': ['notion.so', 'gamma.app', 'tome.app', 'beautiful.ai', 'fireflies.ai', 'read.ai', 'gong.io'],
+    'AI Image': ['midjourney.com', 'stability.ai', 'leonardo.ai', 'ideogram.ai', 'playground.ai', 'firefly.adobe.com', 'canva.com'],
+    'AI Video': ['runwayml.com', 'synthesia.io', 'pika.art', 'heygen.com', 'luma.ai', 'descript.com'],
+    'AI Audio': ['elevenlabs.io', 'play.ht', 'murf.ai', 'suno.com', 'udio.com', 'speechify.com'],
+    'AI Writing': ['jasper.ai', 'copy.ai', 'writesonic.com', 'grammarly.com', 'quillbot.com', 'wordtune.com'],
+    'AI Search': ['perplexity.ai', 'consensus.app', 'elicit.com', 'scite.ai'],
+    'AI Productivity': ['notion.so', 'gamma.app', 'tome.app', 'beautiful.ai', 'fireflies.ai']
   };
 
-  const aiCats = document.getElementById('ai-categories');
-  const aiCustomList = document.getElementById('ai-custom-list');
-  const aiAddInput = document.getElementById('ai-add-input');
-  const aiAddBtn = document.getElementById('ai-add-btn');
-  const aiResetBtn = document.getElementById('ai-reset-btn');
+  const siteCategories = $('site-categories');
+  const customSitesList = $('custom-sites-list');
+  const customSiteInput = $('custom-site-input');
+  const addSiteBtn = $('add-site-btn');
+  const resetSitesBtn = $('reset-sites-btn');
+  const enabledCountEl = $('enabled-count');
+  const customCountEl = $('custom-count');
 
   function getCustomOverrides() {
     return currentConfig.customAiHosts || [];
@@ -92,55 +107,89 @@ document.addEventListener('DOMContentLoaded', async () => {
     return getCustomOverrides().includes('-' + host);
   }
 
+  function updateSiteStats() {
+    const overrides = getCustomOverrides();
+    const removedCount = overrides.filter(e => e.startsWith('-')).length;
+    const customAdded = overrides.filter(e => e.startsWith('+')).length;
+    
+    let totalEnabled = 0;
+    for (const hosts of Object.values(AI_CATEGORIES)) {
+      totalEnabled += hosts.filter(h => !isRemoved(h)).length;
+    }
+    
+    enabledCountEl.textContent = totalEnabled;
+    customCountEl.textContent = customAdded;
+  }
+
   function renderAiSites() {
-    aiCats.innerHTML = '';
+    siteCategories.innerHTML = '';
+    
     for (const [cat, hosts] of Object.entries(AI_CATEGORIES)) {
-      const div = document.createElement('div');
-      const label = document.createElement('div');
-      label.className = 'ai-cat-name';
-      label.textContent = cat;
-      div.appendChild(label);
-      const row = document.createElement('div');
-      row.className = 'pill-row';
+      const group = document.createElement('div');
+      group.className = 'site-category-group';
+      
+      const name = document.createElement('div');
+      name.className = 'site-category-name';
+      name.textContent = cat;
+      group.appendChild(name);
+      
+      const pills = document.createElement('div');
+      pills.className = 'site-pills';
+      
       hosts.forEach(h => {
         const pill = document.createElement('span');
-        pill.className = 'pill' + (isRemoved(h) ? ' removed' : '');
-        pill.textContent = h;
+        pill.className = 'site-pill' + (isRemoved(h) ? ' removed' : '');
+        
+        const text = document.createElement('span');
+        text.textContent = h;
+        pill.appendChild(text);
+        
         const removeBtn = document.createElement('span');
-        removeBtn.className = 'pill-remove';
+        removeBtn.className = 'site-pill-remove';
         removeBtn.textContent = '×';
         removeBtn.title = isRemoved(h) ? 'Restore' : 'Remove';
-        removeBtn.addEventListener('click', () => toggleBuiltIn(h));
+        removeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleBuiltIn(h);
+        });
         pill.appendChild(removeBtn);
-        row.appendChild(pill);
+        
+        pills.appendChild(pill);
       });
-      div.appendChild(row);
-      aiCats.appendChild(div);
+      
+      group.appendChild(pills);
+      siteCategories.appendChild(group);
     }
 
-    aiCustomList.innerHTML = '';
+    customSitesList.innerHTML = '';
     const customAdded = getCustomOverrides().filter(e => e.startsWith('+'));
+    
     if (customAdded.length > 0) {
       const label = document.createElement('div');
-      label.className = 'ai-cat-name';
+      label.className = 'site-category-name';
       label.textContent = 'Custom Added';
-      aiCustomList.appendChild(label);
+      customSitesList.appendChild(label);
+      
       for (const entry of customAdded) {
         const domain = entry.substring(1);
         const row = document.createElement('div');
         row.className = 'custom-site-row';
+        
         const span = document.createElement('span');
         span.textContent = domain;
+        
         const btn = document.createElement('button');
-        btn.className = 'btn-remove';
-        btn.textContent = '×';
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
         btn.title = 'Remove';
         btn.addEventListener('click', () => removeCustom(domain));
+        
         row.appendChild(span);
         row.appendChild(btn);
-        aiCustomList.appendChild(row);
+        customSitesList.appendChild(row);
       }
     }
+    
+    updateSiteStats();
   }
 
   function toggleBuiltIn(host) {
@@ -163,8 +212,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderAiSites();
   }
 
-  aiAddBtn.addEventListener('click', () => {
-    const val = aiAddInput.value.trim().toLowerCase();
+  addSiteBtn.addEventListener('click', () => {
+    const val = customSiteInput.value.trim().toLowerCase();
     if (!val) return;
     const overrides = [...getCustomOverrides()];
     if (!overrides.includes('+' + val)) {
@@ -173,34 +222,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       saveConfig({ customAiHosts: overrides });
       renderAiSites();
     }
-    aiAddInput.value = '';
+    customSiteInput.value = '';
   });
 
-  aiAddInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); aiAddBtn.click(); }
+  customSiteInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addSiteBtn.click(); }
   });
 
-  aiResetBtn.addEventListener('click', () => {
-    currentConfig.customAiHosts = [];
-    saveConfig({ customAiHosts: [] });
-    renderAiSites();
-  });
-
-  function updateSmartModeUI() {
-    const smart = smartModeToggle.checked;
-    whitelistSection.classList.toggle('hidden', !smart);
-  }
-
-  smartModeToggle.addEventListener('change', () => {
-    currentConfig.smartMode = smartModeToggle.checked;
-    saveConfig({ smartMode: currentConfig.smartMode });
-    updateSmartModeUI();
-  });
-
-  whitelistTextarea.addEventListener('change', () => {
-    const domains = whitelistTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
-    currentConfig.domainWhitelist = domains;
-    saveConfig({ domainWhitelist: domains });
+  resetSitesBtn.addEventListener('click', () => {
+    if (confirm('Reset all AI site settings to defaults?')) {
+      currentConfig.customAiHosts = [];
+      saveConfig({ customAiHosts: [] });
+      renderAiSites();
+    }
   });
 
   // ── Config ──
@@ -223,19 +257,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     chrome.storage.local.set(partial);
   }
 
+  function sanitizeRules(rules) {
+    if (!Array.isArray(rules)) return [];
+    return rules
+      .filter(r => r && r.pattern && typeof r.pattern === 'string')
+      .map(r => ({
+        pattern: r.pattern,
+        replacement: typeof r.replacement === 'string' ? r.replacement : '',
+        flags: (r.flags || 'g').replace(/[^gimsuy]/g, '') || 'g',
+        enabled: r.enabled !== false,
+        name: typeof r.name === 'string' ? r.name : ''
+      }));
+  }
+
   // ── Populate UI ──
   function populateUI() {
     masterToggle.checked = currentConfig.enabled !== false;
     smartModeToggle.checked = currentConfig.smartMode !== false;
     autoConvertToggle.checked = !!currentConfig.autoConvert;
-    updateSmartModeUI();
     updateStatus();
 
-    timerSlider.value = currentConfig.autoDismissSeconds || 10;
-    timerValue.textContent = (currentConfig.autoDismissSeconds || 10) + 's';
-
     blacklistTextarea.value = (currentConfig.domainBlacklist || []).join('\n');
-    whitelistTextarea.value = (currentConfig.domainWhitelist || []).join('\n');
     yamlToggle.checked = currentConfig.yamlFrontmatter !== false;
 
     csvSlider.value = currentConfig.csvStreamThreshold || 5;
@@ -267,17 +309,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateStatus();
   });
 
+  smartModeToggle.addEventListener('change', () => {
+    currentConfig.smartMode = smartModeToggle.checked;
+    saveConfig({ smartMode: currentConfig.smartMode });
+  });
+
   autoConvertToggle.addEventListener('change', () => {
     currentConfig.autoConvert = autoConvertToggle.checked;
     saveConfig({ autoConvert: currentConfig.autoConvert });
-  });
-
-  timerSlider.addEventListener('input', () => {
-    timerValue.textContent = timerSlider.value + 's';
-  });
-  timerSlider.addEventListener('change', () => {
-    currentConfig.autoDismissSeconds = parseInt(timerSlider.value, 10);
-    saveConfig({ autoDismissSeconds: currentConfig.autoDismissSeconds });
   });
 
   blacklistTextarea.addEventListener('change', () => {
@@ -321,20 +360,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ── Regex pipeline ──
-  // keep in sync with postprocess.js sanitizeRegexPipeline()
-  function sanitizeRules(rules) {
-    if (!Array.isArray(rules)) return [];
-    return rules
-      .filter(r => r && r.pattern && typeof r.pattern === 'string')
-      .map(r => ({
-        pattern: r.pattern,
-        replacement: typeof r.replacement === 'string' ? r.replacement : '',
-        flags: (r.flags || 'g').replace(/[^gimsuy]/g, '') || 'g',
-        enabled: r.enabled !== false,
-        name: typeof r.name === 'string' ? r.name : ''
-      }));
-  }
-
   function renderRegexRules() {
     regexContainer.innerHTML = '';
     const rules = currentConfig.regexPipeline || [];
@@ -348,7 +373,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const div = document.createElement('div');
       div.className = 'regex-rule';
 
-      // Header
       const header = document.createElement('div');
       header.className = 'regex-rule-header';
 
@@ -361,22 +385,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const toggle = document.createElement('input');
       toggle.type = 'checkbox';
-      toggle.className = 'switch regex-enabled';
+      toggle.className = 'switch';
       toggle.dataset.idx = idx;
       toggle.checked = rule.enabled !== false;
 
       const removeBtn = document.createElement('button');
-      removeBtn.className = 'btn-remove';
+      removeBtn.className = 'btn-icon';
       removeBtn.dataset.idx = idx;
       removeBtn.title = 'Remove';
-      removeBtn.textContent = '×';
+      removeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 
       actions.appendChild(toggle);
       actions.appendChild(removeBtn);
       header.appendChild(title);
       header.appendChild(actions);
 
-      // Pattern
       const pattern = document.createElement('input');
       pattern.type = 'text';
       pattern.className = 'regex-pattern';
@@ -384,7 +407,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       pattern.placeholder = 'Pattern';
       pattern.value = rule.pattern || '';
 
-      // Replacement + flags
       const row = document.createElement('div');
       row.className = 'regex-rule-row';
 
@@ -401,7 +423,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       flags.dataset.idx = idx;
       flags.placeholder = 'g';
       flags.value = rule.flags || 'g';
-      flags.style.cssText = 'width:40px;text-align:center;flex:none';
 
       row.appendChild(replacement);
       row.appendChild(flags);
@@ -412,7 +433,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       regexContainer.appendChild(div);
     });
 
-    // Bind events
     regexContainer.querySelectorAll('.regex-pattern').forEach(el => {
       el.addEventListener('change', (e) => {
         const i = +e.target.dataset.idx;
@@ -437,7 +457,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
-    regexContainer.querySelectorAll('.regex-enabled').forEach(el => {
+    regexContainer.querySelectorAll('.regex-enabled, .switch[data-idx]').forEach(el => {
       el.addEventListener('change', (e) => {
         const i = +e.target.dataset.idx;
         currentConfig.regexPipeline[i].enabled = e.target.checked;
@@ -445,7 +465,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
-    regexContainer.querySelectorAll('.btn-remove').forEach(btn => {
+    regexContainer.querySelectorAll('.btn-remove, .btn-icon[data-idx]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const i = +e.target.dataset.idx;
         currentConfig.regexPipeline.splice(i, 1);
@@ -466,7 +486,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderHistory() {
     const history = currentConfig.conversionHistory || [];
     if (history.length === 0) {
-      historyList.innerHTML = '<div class="empty"><p>No conversions yet</p><span>Drop a file on any webpage to start</span></div>';
+      historyList.innerHTML = `
+        <div class="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <p>No conversions yet</p>
+          <span>Drop a file on any webpage to start</span>
+        </div>`;
       return;
     }
 
@@ -508,9 +533,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   btnClearHistory.addEventListener('click', () => {
-    currentConfig.conversionHistory = [];
-    saveConfig({ conversionHistory: [] });
-    renderHistory();
+    if (confirm('Clear all conversion history?')) {
+      currentConfig.conversionHistory = [];
+      saveConfig({ conversionHistory: [] });
+      renderHistory();
+    }
   });
 
   // ── External config sync ──

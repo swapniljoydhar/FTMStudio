@@ -1,5 +1,5 @@
 // ===========================================================================
-// offscreen.js — Ephemeral Binary File Parser (v1.0.1)
+// offscreen.js — Ephemeral Binary File Parser (v2.0)
 // ===========================================================================
 //
 // EXECUTES INSIDE THE OFFSCREEN DOCUMENT.
