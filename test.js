@@ -44,7 +44,7 @@ function assertThrows(fn, label) {
 // EXTRACT FUNCTIONS FROM SOURCE (portable copies for testing)
 // ===========================================================================
 
-// --- C3: sanitizeCsvCell (from content.js) ---
+// --- C3: sanitizeCsvCell (from utils.js) ---
 function sanitizeCsvCell(value) {
   if (typeof value !== 'string') value = String(value ?? '');
   if (/^[=+\-@]/.test(value)) {
@@ -53,7 +53,7 @@ function sanitizeCsvCell(value) {
   return value;
 }
 
-// --- C2: escapeYamlString (from content.js) ---
+// --- C2: escapeYamlString (from postprocess.js) ---
 function escapeYamlString(str) {
   return str
     .replace(/\\/g, '\\\\')
@@ -96,7 +96,7 @@ function isRegexSafe(pattern) {
   }
 }
 
-// --- M1: enforceHeadingHierarchy (from content.js) ---
+// --- M1: enforceHeadingHierarchy (from postprocess.js) ---
 function enforceHeadingHierarchy(text) {
   const allHeadings = text.match(/^(#{1,6})\s/gm);
   if (!allHeadings || allHeadings.length === 0) return text;
@@ -164,7 +164,7 @@ function shouldActivate(hostname, config) {
   return matched;
 }
 
-// --- H6: decrementPending (from content.js) ---
+// --- H6: decrementPending (from binary.js) ---
 function makeDecrementPending() {
   let pendingConversions = 0;
   return {
