@@ -45,9 +45,9 @@ FTM.MAGIC_SIGNATURES = [
 FTM.AI_HOSTS = [
   // ── LLM Chatbots ──
   'chat.openai.com', 'chatgpt.com', 'platform.openai.com',
-  'claude.ai', 'console.anthropic.com',
+  'claude.ai', 'console.anthropic.com', 'chat.qwen.ai',
   'gemini.google.com', 'bard.google.com', 'aistudio.google.com',
-  'copilot.microsoft.com', 'bing.com',
+  'copilot.microsoft.com', 'bing.com', 'chat.deepseek.com',
   'chat.deepseek.com', 'deepseek.com',
   'chat.mistral.ai', 'mistral.ai',
   'huggingface.co', 'hf.co',
@@ -83,7 +83,7 @@ FTM.AI_HOSTS = [
   'writesonic.com', 'chatsonic.com',
   'rytr.me',
   'sudowrite.com',
-  'Shortlyai.com',
+  'shortlyai.com',
   'copysmith.ai',
   'anyword.com',
   'wordtune.com',
