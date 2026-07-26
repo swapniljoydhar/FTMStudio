@@ -244,6 +244,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 // 5. INSTALLATION / UPGRADE HANDLING
 // ---------------------------------------------------------------------------
 
+// Default configuration — keep in sync with popup.js DEFAULT_CONFIG
 const DEFAULT_CONFIG = {
   enabled: true,
   smartMode: true,
