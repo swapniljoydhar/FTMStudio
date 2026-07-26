@@ -3,292 +3,214 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FTM — File to Markdown Converter</title>
+  <title>FTM Studio</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="app">
 
-    <!-- ─── HEADER ─── -->
+    <!-- Header -->
     <header class="header">
-      <div class="header-left">
-        <div class="logo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <path d="M12 18v-6"/>
-            <path d="m9 15 3-3 3 3"/>
-          </svg>
-        </div>
-        <div class="header-title-box">
-          <h1>FTM Studio</h1>
-          <p class="tagline">Local Conversion Engine</p>
-        </div>
-      </div>
-      <label class="power-toggle" title="Master Interception Switch">
+      <h1>FTM Studio</h1>
+      <label class="toggle" title="Enable / Disable">
         <input type="checkbox" id="master-toggle" checked>
-        <span class="toggle-track">
-          <span class="toggle-thumb"></span>
-        </span>
+        <span class="toggle-track"><span class="toggle-thumb"></span></span>
       </label>
     </header>
 
-    <!-- ─── STATUS BAR ─── -->
-    <div class="status-bar">
-      <div class="status-indicator">
-        <span class="status-dot" id="status-dot"></span>
-        <span class="status-label" id="status-label">Active</span>
-      </div>
-      <div class="status-badge">
-        <span>100% Offline</span>
-        <span class="version">v6.5</span>
-      </div>
-    </div>
-
-    <!-- ─── FORMAT BADGES ─── -->
-    <section class="formats">
-      <span class="format-label">Supported Formats</span>
-      <div class="badge-row">
-        <span class="badge badge-accent">PDF</span>
-        <span class="badge">DOCX</span>
-        <span class="badge">XLSX</span>
-        <span class="badge">PPTX</span>
-        <span class="badge">EPUB</span>
-        <span class="badge">CSV</span>
-        <span class="badge">TXT</span>
-        <span class="badge">RTF</span>
-        <span class="badge">CODE</span>
-      </div>
-    </section>
-
-    <!-- ─── TABS ─── -->
+    <!-- Tabs -->
     <nav class="tabs">
-      <button class="tab active" data-tab="settings">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Settings
-      </button>
-      <button class="tab" data-tab="advanced">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-        Advanced
-      </button>
-      <button class="tab" data-tab="history">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 16 14"/></svg>
-        History
-      </button>
+      <button class="tab active" data-tab="settings">General</button>
+      <button class="tab" data-tab="advanced">Advanced</button>
+      <button class="tab" data-tab="history">History</button>
     </nav>
 
-    <!-- ═══ SETTINGS TAB ═══ -->
-    <div class="tab-panel active" id="panel-settings">
+    <!-- ═══ GENERAL ═══ -->
+    <div class="panel active" id="panel-settings">
 
-      <!-- Auto-Dismiss -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Toast Countdown Timer</span>
-          <span class="card-value" id="timer-value">10s</span>
-        </div>
-        <div class="card-body">
-          <input type="range" id="timer-slider" min="0" max="30" value="10" step="1">
-          <div class="range-labels">
-            <span>Manual Only (0s)</span>
-            <span>30 Seconds</span>
+      <section class="section">
+        <label class="row">
+          <div>
+            <span class="row-label">Smart Mode</span>
+            <span class="row-sub">Only intercept on AI/chatbot sites</span>
           </div>
-        </div>
-      </div>
+          <input type="checkbox" id="smart-mode" checked class="switch">
+        </label>
+      </section>
 
-      <!-- File Categories -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Interception Categories</span>
-        </div>
-        <div class="card-body">
-          <div class="toggle-list">
-            <label class="toggle-row">
-              <div>
-                <span class="toggle-row-label">PDF Documents</span>
-                <span class="toggle-row-exts">.pdf</span>
-              </div>
-              <label class="mini-toggle">
-                <input type="checkbox" id="cat-pdf" checked>
-                <span class="mini-track"><span class="mini-thumb"></span></span>
-              </label>
-            </label>
-            <label class="toggle-row">
-              <div>
-                <span class="toggle-row-label">Documents &amp; Text</span>
-                <span class="toggle-row-exts">.docx .txt .rtf .md</span>
-              </div>
-              <label class="mini-toggle">
-                <input type="checkbox" id="cat-documents" checked>
-                <span class="mini-track"><span class="mini-thumb"></span></span>
-              </label>
-            </label>
-            <label class="toggle-row">
-              <div>
-                <span class="toggle-row-label">Spreadsheets</span>
-                <span class="toggle-row-exts">.csv .xlsx .xls</span>
-              </div>
-              <label class="mini-toggle">
-                <input type="checkbox" id="cat-spreadsheets" checked>
-                <span class="mini-track"><span class="mini-thumb"></span></span>
-              </label>
-            </label>
-            <label class="toggle-row">
-              <div>
-                <span class="toggle-row-label">Presentations</span>
-                <span class="toggle-row-exts">.pptx</span>
-              </div>
-              <label class="mini-toggle">
-                <input type="checkbox" id="cat-presentations" checked>
-                <span class="mini-track"><span class="mini-thumb"></span></span>
-              </label>
-            </label>
-            <label class="toggle-row">
-              <div>
-                <span class="toggle-row-label">Markup &amp; Ebooks</span>
-                <span class="toggle-row-exts">.html .epub</span>
-              </div>
-              <label class="mini-toggle">
-                <input type="checkbox" id="cat-markup" checked>
-                <span class="mini-track"><span class="mini-thumb"></span></span>
-              </label>
-            </label>
-            <label class="toggle-row">
-              <div>
-                <span class="toggle-row-label">Source Code</span>
-                <span class="toggle-row-exts">.py .js .cpp .css .json .xml</span>
-              </div>
-              <label class="mini-toggle">
-                <input type="checkbox" id="cat-code" checked>
-                <span class="mini-track"><span class="mini-thumb"></span></span>
-              </label>
-            </label>
+      <section class="section" id="whitelist-section">
+        <h2 class="section-label">Custom Sites</h2>
+        <p class="section-hint">Add your own AI tools or sites. One domain per line.</p>
+        <textarea id="whitelist-textarea" rows="3" placeholder="my-ai-app.com&#10;internal-tool.company.net&#10;local-llm:8080"></textarea>
+        <details class="help" open>
+          <summary>Built-in AI sites (click to edit)</summary>
+          <div class="ai-editor">
+            <div class="ai-editor-input">
+              <input type="text" id="ai-add-input" placeholder="add-new-ai-site.com" />
+              <button class="btn-link" id="ai-add-btn">+ Add</button>
+            </div>
+            <div class="ai-categories" id="ai-categories"></div>
+            <div id="ai-custom-list"></div>
+            <button class="btn-link danger" id="ai-reset-btn" style="margin-top:8px;font-size:11px">Reset to defaults</button>
           </div>
-        </div>
-      </div>
+        </details>
+      </section>
 
-      <!-- Domain Blacklist -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Domain Blacklist</span>
+      <section class="section">
+        <h2 class="section-label">Timer</h2>
+        <div class="row">
+          <span class="row-label">Auto-dismiss</span>
+          <span class="row-value" id="timer-value">10s</span>
         </div>
-        <div class="card-body">
-          <p class="card-hint">Ignore file uploads on these hostnames (one per line):</p>
-          <textarea id="blacklist-textarea" rows="3" placeholder="example.com&#10;internal-tool.net"></textarea>
+        <input type="range" id="timer-slider" min="0" max="30" value="10" step="1">
+        <div class="range-hint">
+          <span>Off</span>
+          <span>30s</span>
         </div>
-      </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-label">Formats</h2>
+        <div class="toggles">
+          <label class="row">
+            <div>
+              <span class="row-label">PDF</span>
+              <span class="row-sub">.pdf</span>
+            </div>
+            <input type="checkbox" id="cat-pdf" checked class="switch">
+          </label>
+          <label class="row">
+            <div>
+              <span class="row-label">Documents</span>
+              <span class="row-sub">.docx .txt .rtf .md</span>
+            </div>
+            <input type="checkbox" id="cat-documents" checked class="switch">
+          </label>
+          <label class="row">
+            <div>
+              <span class="row-label">Spreadsheets</span>
+              <span class="row-sub">.csv .xlsx .xls</span>
+            </div>
+            <input type="checkbox" id="cat-spreadsheets" checked class="switch">
+          </label>
+          <label class="row">
+            <div>
+              <span class="row-label">Presentations</span>
+              <span class="row-sub">.pptx</span>
+            </div>
+            <input type="checkbox" id="cat-presentations" checked class="switch">
+          </label>
+          <label class="row">
+            <div>
+              <span class="row-label">Markup &amp; Ebooks</span>
+              <span class="row-sub">.html .epub</span>
+            </div>
+            <input type="checkbox" id="cat-markup" checked class="switch">
+          </label>
+          <label class="row">
+            <div>
+              <span class="row-label">Source Code</span>
+              <span class="row-sub">.py .js .cpp .css .json .xml</span>
+            </div>
+            <input type="checkbox" id="cat-code" checked class="switch">
+          </label>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-label">Blocked domains</h2>
+        <textarea id="blacklist-textarea" rows="2" placeholder="example.com&#10;internal-tool.net"></textarea>
+      </section>
 
     </div>
 
-    <!-- ═══ ADVANCED TAB ═══ -->
-    <div class="tab-panel" id="panel-advanced">
+    <!-- ═══ ADVANCED ═══ -->
+    <div class="panel" id="panel-advanced">
 
-      <!-- YAML Frontmatter -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">YAML Frontmatter Header</span>
-          <label class="mini-toggle">
-            <input type="checkbox" id="yaml-toggle" checked>
-            <span class="mini-track"><span class="mini-thumb"></span></span>
-          </label>
-        </div>
-        <div class="card-body">
-          <div class="yaml-preview">
-            <code>---
+      <section class="section">
+        <label class="row">
+          <span class="row-label">YAML frontmatter</span>
+          <input type="checkbox" id="yaml-toggle" checked class="switch">
+        </label>
+        <pre class="preview"><code>---
 original_file: "report.pdf"
 original_size: "245 KB"
 converted: "2026-07-25"
 format: "markdown"
----</code>
-          </div>
-        </div>
-      </div>
+---</code></pre>
+      </section>
 
-      <!-- CSV Threshold -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">CSV Stream Threshold</span>
-          <span class="card-value" id="csv-threshold-value">5 MB</span>
+      <section class="section">
+        <div class="row">
+          <span class="row-label">CSV stream threshold</span>
+          <span class="row-value" id="csv-threshold-value">5 MB</span>
         </div>
-        <div class="card-body">
-          <input type="range" id="csv-threshold-slider" min="1" max="50" value="5" step="1">
-          <div class="range-labels">
-            <span>1 MB</span>
-            <span>50 MB</span>
-          </div>
+        <input type="range" id="csv-threshold-slider" min="1" max="50" value="5" step="1">
+        <div class="range-hint">
+          <span>1 MB</span>
+          <span>50 MB</span>
         </div>
-      </div>
+      </section>
 
-      <!-- Sanitization -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Sanitization Rules</span>
-        </div>
-        <div class="card-body">
-          <div class="toggle-list">
-            <label class="toggle-row">
-              <span class="toggle-row-label">Strip trailing whitespace</span>
-              <label class="mini-toggle">
-                <input type="checkbox" id="opt-strip-trailing" checked>
-                <span class="mini-track"><span class="mini-thumb"></span></span>
-              </label>
-            </label>
-            <label class="toggle-row">
-              <span class="toggle-row-label">Enforce heading hierarchy</span>
-              <label class="mini-toggle">
-                <input type="checkbox" id="opt-heading-hierarchy">
-                <span class="mini-track"><span class="mini-thumb"></span></span>
-              </label>
-            </label>
-          </div>
-        </div>
-      </div>
+      <section class="section">
+        <h2 class="section-label">Cleanup</h2>
+        <label class="row">
+          <span class="row-label">Strip trailing whitespace</span>
+          <input type="checkbox" id="opt-strip-trailing" checked class="switch">
+        </label>
+        <label class="row">
+          <span class="row-label">Enforce heading hierarchy</span>
+          <input type="checkbox" id="opt-heading-hierarchy" class="switch">
+        </label>
+      </section>
 
-      <!-- RegEx Pipeline -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">RegEx Pipeline Rules</span>
-          <button class="btn-ghost" id="btn-add-regex">+ Rule</button>
+      <section class="section">
+        <div class="row">
+          <h2 class="section-label">Regex rules</h2>
+          <button class="btn-link" id="btn-add-regex">+ Add</button>
         </div>
-        <div class="card-body">
-          <div id="regex-rules-container"></div>
-          <details class="help-details">
-            <summary>How RegEx rules work</summary>
-            <div class="help-content">
-              <p>Rules run sequentially on the final Markdown output. All substitutions are performed locally in memory.</p>
-              <pre>Pattern:  https://example\.com/(\w+)
+        <div id="regex-rules-container"></div>
+        <details class="help">
+          <summary>How rules work</summary>
+          <p>Rules run sequentially on the final Markdown output.</p>
+          <pre>Pattern:  https://example\.com/(\w+)
 Replace:  [$1](https://example.com/$1)
 Flags:    g</pre>
-            </div>
-          </details>
-        </div>
-      </div>
+        </details>
+      </section>
 
     </div>
 
-    <!-- ═══ HISTORY TAB ═══ -->
-    <div class="tab-panel" id="panel-history">
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Conversion History Log</span>
-          <div class="card-actions">
-            <button class="btn-ghost-sm" id="btn-export-history">Export JSON</button>
-            <button class="btn-ghost-sm" id="btn-clear-history">Clear</button>
+    <!-- ═══ HISTORY ═══ -->
+    <div class="panel" id="panel-history">
+
+      <section class="section">
+        <div class="row">
+          <span class="row-label">Conversion log</span>
+          <div class="row-actions">
+            <button class="btn-link" id="btn-export-history">Export</button>
+            <button class="btn-link danger" id="btn-clear-history">Clear</button>
           </div>
         </div>
-        <div class="card-body">
-          <div id="history-list">
-            <div class="history-empty">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 16 14"/></svg>
-              <p>No conversions logged</p>
-              <span class="history-hint">Drag & drop files onto any webpage to begin</span>
-            </div>
+        <div id="history-list">
+          <div class="empty">
+            <p>No conversions yet</p>
+            <span>Drop a file on any webpage to start</span>
           </div>
         </div>
-      </div>
+      </section>
+
     </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span id="status-label">Active</span>
+      <span class="dot" id="status-dot"></span>
+      <span class="sep">·</span>
+      <span id="version-badge"></span>
+    </footer>
 
   </div>
-
   <script src="popup.js"></script>
 </body>
 </html>
