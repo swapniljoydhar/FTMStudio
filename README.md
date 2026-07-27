@@ -2,8 +2,8 @@
 
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue)](https://developer.chrome.com/docs/extensions/mv3/intro/)
 [![Privacy First](https://img.shields.io/badge/Privacy-100%25%20Local-green)]()
-[![Version](https://img.shields.io/badge/version-2.0.0-orange)]()
-[![Tests](https://img.shields.io/badge/tests-233%20passing-brightgreen)]()
+[![Version](https://img.shields.io/badge/version-3.0.0-orange)]()
+[![Tests](https://img.shields.io/badge/tests-62%20passing-brightgreen)]()
 
 A **privacy-first**, **100% local** Chrome extension that intercepts file uploads on AI/chatbot websites and converts documents to structured Markdown **before data leaves your browser**. All processing happens client-side — no servers, no cloud, no tracking.
 
@@ -34,16 +34,17 @@ The extension only activates on **AI and chatbot sites** by default — no annoy
 
 ### Security Features
 
-- **ReDoS Protection** — timing-based regex validation
-- **CSV Formula Injection** — sanitizes `=`, `+`, `-`, `@` prefixed cells
-- **YAML Injection** — escapes special characters in filenames
+- **ReDoS Protection** — structural pattern rejection plus adversarial timing probes, cached per pattern and flags
+- **CSV Formula Injection** — sanitizes `=`, `+`, `-`, `@`, `|`, tab and CR prefixed cells, including leading whitespace
+- **YAML Injection** — metadata emitted as double-quoted scalars with legal escapes only
 - **Magic Byte Detection** — identifies binary formats by signature
-- **Content Size Limits** — 50MB binary / 10MB text hard limits
+- **Content Size Limits** — 50MB binary / 10MB text / 10MB image hard limits
 - **Fail-Closed Activation** — extension disables itself on errors instead of activating everywhere
 
 ### Other Capabilities
 
-- **Zero-Copy Architecture** — Transferable Objects for instant ArrayBuffer transfer
+- **Chunked Binary Transport** — files stream to the parser in bounded base64 chunks (extension messaging is JSON, so transfer lists are silently ignored)
+- **On-Demand Injection** — content scripts are registered dynamically, so nothing is injected into non-AI pages
 - **Shadow DOM Toast** — encapsulated, non-intrusive prompt with file type badges
 - **Capture-Phase Interception** — fires before React/Vue/Svelte handlers
 - **YAML Frontmatter** — auto-injects metadata
@@ -53,6 +54,7 @@ The extension only activates on **AI and chatbot sites** by default — no annoy
 - **Dark Mode** — respects system preference
 - **AI Site Search** — filter through 200+ built-in AI platforms
 - **Processing Spinner** — visual feedback during binary file conversion
+- **Multi-File Uploads** — the first eligible file is converted and the remaining files are re-dispatched untouched
 
 ---
 
@@ -135,7 +137,7 @@ FTM Studio sits quietly in your browser and watches for file uploads. When you d
 
 1. **Event Capture** — `intercept.js` registers capture-phase listeners for `drop` and `change` events. Capture phase fires *before* the page's own handlers (React, Vue, Svelte), so the extension gets first dibs.
 
-2. **Smart Mode Check** — `shouldActivate()` checks if the current site is a known AI platform (200+ built-in hosts). If Smart Mode is off, it activates everywhere. Blacklisted domains are always skipped.
+2. **Smart Mode Check** — the verdict is computed once per document and cached (invalidated on config changes). `shouldActivate()` checks if the current site is a known AI platform (200+ built-in hosts). If Smart Mode is off, it activates everywhere. Blacklisted domains are always skipped.
 
 3. **File Type Detection** — The file extension maps to a category (documents, pdf, spreadsheets, etc.). If that category is enabled in settings, the file is intercepted. A secondary magic-byte check verifies the actual file type matches the extension.
 
@@ -146,7 +148,7 @@ FTM Studio sits quietly in your browser and watches for file uploads. When you d
    - **CSV** — Parsed via Papa Parse, converted to Markdown table. Large files (>5MB) use streaming mode
    - **RTF** — Stripped to plain text via regex
    - **Images** — Converted to base64 data URI and embedded as Markdown images
-   - **Binary files** (`.docx`, `.xlsx`, `.pdf`, `.epub`, `.pptx`) — ArrayBuffer sent via Transferable Objects to an offscreen document where parser libraries (mammoth, SheetJS, PDF.js, JSZip) run in isolation
+   - **Binary files** (`.docx`, `.xlsx`, `.pdf`, `.epub`, `.pptx`) — bytes are sent in bounded base64 chunks to an offscreen document where parser libraries (mammoth, SheetJS, PDF.js, JSZip) run in isolation
 
 6. **Post-Processing** — The Markdown goes through:
    - Trailing whitespace removal
@@ -163,25 +165,30 @@ FTM Studio sits quietly in your browser and watches for file uploads. When you d
 ┌─────────────────────────────────────────────────────┐
 │  Layer 1: Content Script (runs on every page)       │
 │                                                     │
-│  constants.js → utils.js → config.js → postprocess  │
-│  converters.js → binary.js → history.js → toast.js  │
-│  intercept.js (entry point, event handlers)         │
+│  shared/{constants,text,config}.js                  │
+│  content/{config,activation,postprocess}.js         │
+│  content/{converters,transport,router}.js           │
+│  content/{history,toast,intercept}.js               │
+│  Registered dynamically (chrome.scripting), so only │
+│  activatable hosts are instrumented.                │
 └───────────────────────┬─────────────────────────────┘
                         │ Port: "ftm"
                         ▼
 ┌─────────────────────────────────────────────────────┐
 │  Layer 2: Background Service Worker                 │
 │                                                     │
-│  background.js — port routing, offscreen lifecycle, │
-│  config sync, install/update handling               │
+│  background.js + sw/{offscreen-manager,bridge,      │
+│  registrar}.js — port bridging, refcounted offscreen │
+│  lifecycle, config fan-out, script registration     │
 └───────────────────────┬─────────────────────────────┘
                         │ Port: "ftm-offscreen-internal"
                         ▼
 ┌─────────────────────────────────────────────────────┐
 │  Layer 3: Offscreen Document (ephemeral)            │
 │                                                     │
-│  offscreen.js — loads parser libraries on demand,   │
-│  processes binary files, aggressively cleans up     │
+│  offscreen.js + offscreen/{loader,documents,        │
+│  archives,tabular}.js — one session per port, libs  │
+│  loaded lazily, document closed when idle           │
 │                                                     │
 │  Libraries: mammoth, xlsx, jszip, turndown,         │
 │  turndown-plugin-gfm, pdf.js, papaparse             │
@@ -193,22 +200,22 @@ FTM Studio sits quietly in your browser and watches for file uploads. When you d
 - **Service workers** can't access DOM APIs (needed for parser libraries)
 - **Offscreen document** is a hidden DOM context that can load libraries and parse files, then destroy itself when done — zero memory overhead when idle
 
-### Transferable Objects (Zero-Copy)
+### Chunked Binary Transport
 
-When a binary file needs processing, the ArrayBuffer is transferred (not copied) to the offscreen document:
+`chrome.runtime.Port.postMessage` has no transfer-list parameter and serialises
+its payload as JSON, so `ArrayBuffer`s cannot be moved (or even sent) over it.
+Bytes are therefore framed as bounded base64 chunks:
 
 ```js
-// Content script — transfers ownership instantly
-port.postMessage(
-  { type: 'PROCESS_BINARY_FILE', data: { fileName, extension, arrayBuffer } },
-  [arrayBuffer]  // ← Transferable flag: ownership moves, no clone
-);
-
-// After this call, arrayBuffer.byteLength === 0 in the content script
-// The offscreen document now owns the memory
+port.postMessage({ type: 'BEGIN', data: { fileName, extension, size, totalChunks } });
+for (const base64 of FTM.text.encodeChunks(bytes)) {
+  port.postMessage({ type: 'CHUNK', data: { base64 } });
+}
+port.postMessage({ type: 'END' });
 ```
 
-This means a 50MB DOCX file doesn't temporarily double to 100MB during transfer.
+Each chunk is 512 KB, so peak transport overhead is bounded regardless of file
+size, and the offscreen document reassembles the payload before parsing.
 
 ### Smart Mode Activation
 
@@ -283,16 +290,17 @@ Click the extension icon to open the settings dashboard.
 
 | Threat | Mitigation |
 |--------|-----------|
-| ReDoS | Timing-based regex test (>50ms on 30-char string = rejected) |
+| ReDoS | Structural pattern rejection (nested/bounded quantifiers) + adversarial timing probes, cached per pattern *and* flags with a bounded LRU |
 | CSV Formula Injection | Cells prefixed with `'` before `=`, `+`, `-`, `@` |
-| YAML Injection | Escapes `:`, `"`, `\n`, `[]`, `{}` |
+| YAML Injection | Values emitted as double-quoted scalars with only legal YAML escapes |
 | Binary Disguise | Magic byte signatures + null-byte heuristic |
 | Domain Blacklist Bypass | Exact/suffix hostname matching |
-| Memory Leaks | Aggressive cleanup with try-catch, port-based lifecycle |
-| Race Conditions | Promise-based mutex, guarded counter, cleaned flag |
-| Large File DoS | 50MB binary / 10MB text hard limits |
-| Activation Fail-Open | `shouldActivate()` returns false on errors |
-| Port Hijacking | Duplicate port connections rejected |
+| Memory Leaks | Reference-counted offscreen document closed when idle; bounded chunk buffers |
+| Race Conditions | Messages received before the offscreen document exists are queued, not dropped |
+| Large File DoS | 50MB binary / 10MB text / 10MB image hard limits, bounded message queue |
+| Activation Fail-Open | `shouldActivate()` returns false on errors; registration fails closed instead of falling back to `<all_urls>` |
+| Extension Fingerprinting | No `web_accessible_resources`; parser libraries are only reachable from extension pages |
+| Arbitrary Code Execution | PDF.js 4.10.38 with `isEvalSupported: false` (CVE-2024-4367) |
 
 ---
 
@@ -301,22 +309,32 @@ Click the extension icon to open the settings dashboard.
 ### Testing
 
 ```bash
-node test.js            # 87 unit tests
-node test-pipeline.js   # 146 pipeline integration tests
+npm install
+npm test          # node --test test/ — 62 tests against the real sources
+npm run lint      # eslint
+npm run verify:libs   # SHA-256 verification of the pinned parser libraries
 ```
 
-233 tests covering security-critical functions (ReDoS, CSV injection, YAML injection, domain matching, Smart Mode, heading hierarchy, magic byte detection, regex sanitization, file routing, state machine, concurrent operations).
+The suite loads the actual extension modules in a `vm` context with stubbed
+Chrome APIs (`test/harness.js`) instead of re-implementing them, so regressions
+in the shipped code cannot pass unnoticed. It covers the shared text/config
+helpers, activation gating, post-processing and ReDoS defences, the chunked
+transport and offscreen session protocol, bridge queueing and offscreen
+refcounting, fail-closed script registration, history merging, and static
+source/manifest invariants.
 
 ### Library Management
 
 Libraries are pinned in `lib/lockfile.json` with SHA-256 hashes.
 
 ```bash
-./lib/update.sh              # Verify all 8 libraries
-./lib/update.sh pdfjs        # Update PDF.js specifically
-./lib/update.sh turndown-gfm # Update Turndown GFM plugin
-./lib/update.sh all          # Update everything
+./lib/update.sh                 # Verify all 8 libraries against lockfile.json
+./lib/update.sh pdf.min.mjs     # Re-download one lockfile entry
+./lib/update.sh all             # Re-download everything
 ```
+
+Names, URLs, versions and hashes all come from `lockfile.json`, so the script
+and the lockfile cannot drift apart.
 
 ### Project Structure
 
@@ -324,23 +342,32 @@ Libraries are pinned in `lib/lockfile.json` with SHA-256 hashes.
 FTMStudio/
 ├── file-to-markdown-extension/   # The extension
 │   ├── manifest.json             # MV3 config, permissions, CSP
-│   ├── background.js             # Service worker (port routing)
-│   ├── content/                  # Content script modules
-│   │   ├── constants.js          # Magic numbers, extension maps, AI hosts
-│   │   ├── utils.js              # Pure utilities, Smart Mode logic
-│   │   ├── config.js             # Config state, chrome.storage sync
-│   │   ├── postprocess.js        # YAML, regex pipeline, CSV sanitization
-│   │   ├── converters.js         # Text/CSV/RTF/image conversion
-│   │   ├── binary.js             # Offscreen bridge (Transferable Objects)
-│   │   ├── history.js            # Conversion history (debounced)
-│   │   ├── toast.js              # Shadow DOM toast UI
-│   │   └── intercept.js          # Event capture, dispatch, init
-│   ├── offscreen.js / .html      # Ephemeral binary parser
+│   ├── background.js             # Service worker entry point
+│   ├── shared/                   # Loaded in every context
+│   │   ├── constants.js          # Limits, extension maps, AI hosts, protocol
+│   │   ├── text.js               # Escaping, tables, base64 chunks, history merge
+│   │   └── config.js             # Defaults + prototype-safe merge
+│   ├── sw/                       # Service worker modules
+│   │   ├── offscreen-manager.js  # Refcounted offscreen lifecycle
+│   │   ├── bridge.js             # Content ↔ offscreen port bridge
+│   │   └── registrar.js         # Dynamic content-script registration
+│   ├── content/                  # Injected modules
+│   │   ├── config.js             # Config state + CONFIG_UPDATE handling
+│   │   ├── activation.js         # Cached host gating, file eligibility
+│   │   ├── postprocess.js        # YAML frontmatter, regex pipeline, ReDoS guard
+│   │   ├── converters.js         # Text/RTF/image conversion
+│   │   ├── transport.js          # Chunked port transport
+│   │   ├── router.js             # Extension → converter dispatch
+│   │   ├── history.js            # Debounced, merge-on-write history
+│   │   ├── toast.js              # Shadow DOM toast UI (CSS countdown)
+│   │   └── intercept.js          # Event capture, session state, re-dispatch
+│   ├── offscreen.js / .html      # Session protocol + parser host
+│   ├── offscreen/                # loader, documents, archives, tabular
 │   ├── popup.html / .js / .css   # Settings dashboard
 │   ├── lib/                      # 8 pinned parser libraries
 │   └── icons/                    # Extension icons (16/48/128px)
-├── test.js                       # Unit tests (87)
-├── test-pipeline.js              # Integration tests (146)
+├── test/                         # node:test suite + real-source harness
+├── package.json / eslint.config.mjs
 ├── README.md
 └── SECURITY_AUDIT.md
 ```
@@ -355,15 +382,15 @@ FTMStudio/
 |----------|--------|
 | **100% Private** | Zero network requests. No telemetry, no cloud, no tracking. All processing happens locally in the browser. Even the parser libraries are bundled — no CDN calls at runtime. |
 | **Zero Memory Overhead When Idle** | The offscreen document (where heavy parsers run) is created on demand and destroyed immediately after use. When no file is being converted, the extension uses near-zero memory. |
-| **Zero-Copy Binary Transfer** | Transferable Objects move ArrayBuffer ownership instantly without cloning. A 50MB file doesn't temporarily double to 100MB during processing. |
+| **Bounded Binary Transport** | Files are framed as 512 KB base64 chunks over the port, so transport overhead stays constant instead of scaling with file size. |
 | **Smart Mode** | Only activates on 200+ known AI platforms by default. Won't intercept uploads on Gmail, banking, government, or social media sites. Reduces attack surface and avoids annoying users. |
 | **Capture-Phase Interception** | Event listeners fire at capture phase, before React/Vue/Svelte synthetic event handlers. This means the extension intercepts files even on heavily-frameworked SPAs. |
 | **Shadow DOM Isolation** | The toast UI uses `mode: 'closed'` Shadow DOM, so host page CSS can't break the extension's styling, and the extension can't leak styles into the page. |
 | **Security-Hardened** | ReDoS protection, CSV formula injection prevention, YAML injection escaping, magic byte validation, fail-closed activation, port race condition guards, message validation. |
-| **Comprehensive Test Suite** | 233 tests (87 unit + 146 integration) covering security-critical paths, file routing, state machine, concurrent operations, and edge cases. |
+| **Tests Run Against the Real Sources** | 62 `node:test` cases load the shipped modules in a `vm` context with stubbed Chrome APIs, so a regression in the extension fails the suite. |
 | **Library Integrity Verification** | All 8 parser libraries pinned with SHA-256 hashes in `lockfile.json`. `update.sh` verifies integrity before and after updates. |
-| **Modular Architecture** | 9 focused content script modules with clear single responsibilities. Each module can be understood, tested, and maintained independently. |
-| **Graceful Degradation** | If Papa Parse isn't loaded, CSV falls back to a built-in parser. If a binary conversion fails, the original file is re-dispatched so the upload still works. |
+| **Modular Architecture** | Shared, service-worker, content and offscreen modules with single responsibilities and no duplicated config/conversion logic. |
+| **Graceful Degradation** | If a conversion fails, the original file is re-dispatched so the upload still works. |
 | **Accessibility** | ARIA labels, roles, expanded states on all interactive elements. Focus-visible styles for keyboard navigation. Screen reader compatible. |
 
 ### Weaknesses
@@ -373,9 +400,9 @@ FTMStudio/
 | **Text-Only PDF Extraction** | PDF.js extracts text content only. Scanned PDFs (image-based), password-protected PDFs, and PDFs with complex layouts (tables, multi-column) produce poor output. | Medium — common use case with degraded quality |
 | **No DOCX Visual Layout** | Mammoth.js extracts semantic HTML from DOCX, not visual layout. Tables, images, headers/footers, and complex formatting are lost or simplified. | Medium — output differs from visual appearance |
 | **No DRM/Protected Content** | DRM-protected EPUBs, encrypted PDFs, and password-protected Office files cannot be processed. | Low — expected limitation, no workaround possible |
-| **ReDoS Protection Has Gaps** | Timing-based checker uses 30-char test strings. Bounded nested quantifiers like `(a{1,10}){1,10}` pass the check but can cause exponential backtracking on longer inputs. | Low — mitigated by 2MB text length guard |
-| **`<all_urls>` Host Permission** | The extension requests permission to run on all websites (required for Smart Mode to work). While Smart Mode limits actual activation, the permission itself is broad. | Low — necessary for the feature set |
-| **Single-File Processing** | Each file upload is processed one at a time. Multi-file uploads (e.g., `<input multiple>`) only intercept the first file. | Low — most AI chatbots accept one file at a time |
+| **ReDoS Protection Is Heuristic** | Structural detection plus adversarial timing probes rejects the known catastrophic shapes, including bounded nested quantifiers, but is not a formal automaton analysis. | Low — mitigated by the 2MB pipeline input guard |
+| **`<all_urls>` Host Permission** | The permission is still requested so Smart Mode can register scripts for user-added hosts, but scripts are only *registered* for activatable hosts. | Low — no code runs on non-matching sites |
+| **One Converted File Per Upload** | Multi-file uploads convert the first eligible file; the remaining files are passed through unchanged rather than converted. | Low — most AI chatbots accept one document at a time |
 | **No Streaming for Binary Files** | Binary files (DOCX, PDF, XLSX) are fully loaded into memory before processing. Very large files (near the 50MB limit) may cause temporary memory spikes. | Low — 50MB cap prevents extreme cases |
 | **RTF Parser Is Basic** | Regex-based RTF stripping handles common cases but fails on complex RTF with nested groups, embedded objects, or OLE elements. | Low — RTF is increasingly rare |
 | **No Offline Installation** | Libraries are bundled in the extension, so it works offline. However, the `update.sh` tool requires internet to download library updates. | Negligible — only affects development |
@@ -399,7 +426,7 @@ FTMStudio/
 
 - Follow existing code style (single quotes, no semicolons optional)
 - Test on Chrome 116+
-- Run `node test.js && node test-pipeline.js` before submitting PRs
+- Run `npm test && npm run lint` before submitting PRs
 - No new external dependencies without discussion
 
 ---
@@ -422,4 +449,4 @@ MIT License
 
 ---
 
-*Version 2.0.0*
+*Version 3.0.0*

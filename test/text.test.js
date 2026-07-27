@@ -1,0 +1,87 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { loadShared } = require('./harness');
+
+const { FTM } = loadShared();
+const T = FTM.text;
+
+test('getExtension / stem / formatBytes', () => {
+  assert.equal(T.getExtension('report.final.PDF'), '.PDF');
+  assert.equal(T.getExtension('noext'), '');
+  assert.equal(T.stem('a.b.docx'), 'a.b');
+  assert.equal(T.formatBytes(512), '512 B');
+  assert.equal(T.formatBytes(2048), '2.0 KB');
+  assert.equal(T.formatBytes(5 * 1024 * 1024), '5.0 MB');
+});
+
+test('CSV formula injection: leading whitespace, tab and CR are guarded', () => {
+  for (const value of ['=1+1', '+1', '-1', '@SUM(A1)', ' =cmd', '\t=cmd', '\r=cmd', '   \t@evil', '|calc']) {
+    assert.equal(T.sanitizeCsvCell(value)[0], "'", 'expected quote for ' + JSON.stringify(value));
+  }
+  assert.equal(T.sanitizeCsvCell('safe'), 'safe');
+  assert.equal(T.sanitizeCsvCell(null), '');
+});
+
+test('escapeCell escapes pipes and backslashes and flattens newlines in one pass', () => {
+  assert.equal(T.escapeCell('a|b'), 'a\\|b');
+  assert.equal(T.escapeCell('a\\b'), 'a\\\\b');
+  assert.equal(T.escapeCell('a\r\nb'), 'a b');
+});
+
+test('markdownTable pads short rows and never spreads arguments', () => {
+  const md = T.markdownTable([['a', 'b'], ['1']], '# T');
+  assert.equal(md, '# T\n\n| a | b |\n| --- | --- |\n| 1 |  |');
+});
+
+test('markdownTable survives 200k rows (old Math.max spread threw RangeError)', () => {
+  const rows = Array.from({ length: 200000 }, (_, i) => [String(i), 'x']);
+  const md = T.markdownTable(rows, '# Big');
+  assert.equal(md.split('\n').length, 200000 + 3);
+});
+
+test('markdownTable handles an empty input', () => {
+  assert.equal(T.markdownTable([], '# T'), '# T\n\n*No data*');
+});
+
+test('yamlString emits only legal double-quoted escapes', () => {
+  assert.equal(T.yamlString('a:b'), '"a:b"');
+  assert.equal(T.yamlString('say "hi"'), '"say \\"hi\\""');
+  assert.equal(T.yamlString('a\nb\tc'), '"a\\nb\\tc"');
+  assert.equal(T.yamlString('drop\u0007bell'), '"drop\\x07bell"');
+  assert.match(T.yamlString('{braces}'), /^"\{braces\}"$/);
+});
+
+test('plain() strips control characters used to inject extra lines', () => {
+  assert.equal(T.plain('evil\nname'), 'evil name');
+  assert.equal(T.plain('  spaced  '), 'spaced');
+});
+
+test('chunk codec round-trips binary payloads', () => {
+  const bytes = new Uint8Array(300000).map((_, i) => i % 256);
+  const chunks = T.encodeChunks(bytes, 65536);
+  assert.ok(chunks.length > 1);
+  assert.deepEqual([...T.decodeChunks(chunks)], [...bytes]);
+  assert.deepEqual([...T.decodeChunks(T.encodeChunks(new Uint8Array(0)))], []);
+});
+
+test('mergeHistory unions concurrent writers and caps the total', () => {
+  const stored = [{ timestamp: '1', file: 'a' }, { timestamp: '2', file: 'b' }];
+  const local = [{ timestamp: '3', file: 'c' }, { timestamp: '2', file: 'b' }];
+  const names = (list) => [...list].map((e) => e.file);
+  assert.deepEqual(names(T.mergeHistory(stored, local, 50)), ['a', 'b', 'c']);
+  assert.deepEqual(names(T.mergeHistory(stored, local, 2)), ['b', 'c']);
+});
+
+test('magic signature and null-byte detection', () => {
+  assert.equal(T.magicSignature(new Uint8Array([0x25, 0x50, 0x44, 0x46])), 'PDF');
+  assert.equal(T.magicSignature(new Uint8Array([1, 2, 3])), null);
+  assert.equal(T.countNullBytes(new Uint8Array([0, 1, 0])), 2);
+});
+
+test('rtfToMarkdown decodes escapes and drops control words', () => {
+  const md = T.rtfToMarkdown('{\\rtf1\\ansi Hello\\par World\\u8212? end}');
+  assert.match(md, /Hello\nWorld/);
+  assert.match(md, /\u2014/);
+});

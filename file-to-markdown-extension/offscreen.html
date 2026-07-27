@@ -2,43 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FTM Offscreen Processor</title>
-  <!--
-    OFFSCREEN DOCUMENT — Ephemeral Binary File Parser (v2.0)
-    ======================================================================
-    This document is created ON DEMAND by the background service worker
-    via chrome.offscreen.createDocument() when a binary file needs to be
-    converted to Markdown.
-
-    LAZY LIBRARY LOADING:
-    All parser libraries are loaded dynamically via <script> injection
-    from offscreen.js ONLY when needed. They are NOT pre-loaded.
-
-    LOCAL LIBRARY FILES (MUST be placed in the /lib/ folder):
-      - lib/mammoth.browser.min.js   (mammoth.js — for .docx → semantic HTML)
-      - lib/xlsx.mini.min.js         (SheetJS mini — read-only, ~245KB)
-      - lib/jszip.min.js             (JSZip — for .epub ZIP parsing)
-      - lib/turndown.min.js          (Turndown.js — HTML → Markdown, ~10KB)
-      - lib/pdf.min.js               (PDF.js — for .pdf text extraction)
-      - lib/pdf.worker.min.js        (PDF.js worker — for .pdf)
-
-    LIFECYCLE:
-    1. Content script sends CREATE_OFFSCREEN to background
-    2. Background calls chrome.offscreen.createDocument() → this doc loads
-    3. Content script sends PROCESS_BINARY_FILE via port (TRANSFERABLE)
-    4. offscreen.js loads needed parser(s) + Turndown, processes file
-    5. Content script receives Markdown result
-    6. Content script sends CLOSE_OFFSCREEN
-    7. offscreen.js performs AGGRESSIVE CLEANUP
-    8. Background calls chrome.offscreen.closeDocument()
-
-    TRANSFERABLE OBJECTS:
-    The ArrayBuffer is sent via port.postMessage(arrayBuffer, [arrayBuffer])
-    which TRANSFERS ownership with zero copying.
-  -->
+  <title>FTM Studio — Offscreen Parser</title>
 </head>
 <body>
+  <!--
+    Ephemeral parser host. Receives file bytes as base64 chunks over a
+    chrome.runtime port (extension messaging is a JSON channel — ArrayBuffers
+    and transfer lists are not supported), parses them with locally bundled
+    libraries and returns Markdown. Closed by the service worker once idle.
+  -->
+  <script src="shared/constants.js"></script>
+  <script src="shared/text.js"></script>
+  <script src="shared/config.js"></script>
+  <script src="offscreen/loader.js"></script>
+  <script src="offscreen/documents.js"></script>
+  <script src="offscreen/archives.js"></script>
+  <script src="offscreen/tabular.js"></script>
   <script src="offscreen.js"></script>
 </body>
 </html>

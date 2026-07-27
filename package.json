@@ -1,0 +1,17 @@
+{
+  "name": "ftm-studio",
+  "version": "3.0.0",
+  "private": true,
+  "description": "FTM Studio — privacy-first file-to-Markdown Chrome extension",
+  "scripts": {
+    "test": "node --test test/",
+    "lint": "eslint .",
+    "verify:libs": "bash file-to-markdown-extension/lib/update.sh"
+  },
+  "devDependencies": {
+    "eslint": "9.17.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
