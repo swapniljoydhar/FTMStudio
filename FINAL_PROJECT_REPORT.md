@@ -1,8 +1,8 @@
 # File-to-Markdown (FTM Studio) — Comprehensive Project Report
 
-**Version:** 7.0.0 (v1.0.1 Modular Architecture)  
+**Version:** 2.0 (Modular Architecture, Dead-Code-Free, UX-Enhanced)  
 **Architecture:** Manifest V3 Chrome Extension  
-**Status:** Production-Ready, Security-Hardened, Modularized
+**Status:** Production-Ready, Security-Hardened, Modularized, Dead-Code-Free
 
 ---
 
@@ -35,7 +35,7 @@ The extension solves a fundamental UX problem: when users need to upload a Markd
 The extension follows a **three-layer pipeline** architecture:
 
 ### Layer 1: Content Script (Foreground)
-The content script (`content.js` + 9 modular files) runs in the webpage context and performs event interception, toast UI display, text-based conversion, and file substitution. It uses Shadow DOM with `mode: 'closed'` to encapsulate the toast UI from host page CSS interference.
+The content script (9 modular files under `content/`) runs in the webpage context and performs event interception, toast UI display, text-based conversion, and file substitution. It uses Shadow DOM with `mode: 'closed'` to encapsulate the toast UI from host page CSS interference.
 
 ### Layer 2: Background Service Worker
 The background service worker (`background.js`) manages the ephemeral offscreen document lifecycle. It creates the offscreen document on demand when a binary file needs processing, and destroys it immediately after the conversion completes. This ensures zero memory overhead when the extension is idle.
@@ -104,6 +104,16 @@ The offscreen document performs a 6-step cleanup before closing:
 - **CSV Formula Injection:** Cells starting with `=`, `+`, `-`, `@` are prefixed with a quote
 - **Domain Blacklist:** Exact/suffix matching instead of substring (prevents `google.com.evil.com` bypass)
 - **EPUB Parser Error Detection:** Checks for `<parsererror>` after XHTML parsing
+- **WAR Minimization:** Only Papa Parse exposed to web pages (7 other libraries load in extension context only)
+
+### 4.11 UX Enhancements (v4.0)
+- **File Type Badges:** Colored format badge (PDF=red, DOCX=blue, XLSX=green, etc.) in the toast
+- **Size Category Indicator:** File size with color-coding (orange for medium, red for large/huge)
+- **Processing Spinner:** Animated spinner with "Converting\u2026" text during binary file processing
+- **Auto-skip Label:** Countdown timer clearly labeled "Auto-skip in Xs" instead of bare number
+- **AI Site Search:** Real-time search/filter input above the AI site pills in popup
+- **History File Sizes:** Original file size displayed next to each conversion history entry
+- **Unified Color Scheme:** Consistent accent color (`#1a73e8`) across toast and popup
 
 ---
 
@@ -165,26 +175,26 @@ The offscreen document performs a 6-step cleanup before closing:
 
 | File | Lines | Role |
 |------|-------|------|
-| `manifest.json` | ~55 | Extension configuration |
-| `background.js` | ~60 | Service worker |
-| `content/constants.js` | ~40 | Magic numbers, defaults |
-| `content/utils.js` | ~130 | Formatting, sanitization |
-| `content/config.js` | ~60 | State management |
-| `content/intercept.js` | ~160 | Event capture, re-dispatch |
-| `content/toast.js` | ~167 | Shadow DOM toast UI |
-| `content/converters.js` | ~200 | Text/code conversion |
-| `content/binary.js` | ~108 | Offscreen bridge |
-| `content/postprocess.js` | ~123 | YAML, regex, formula injection |
-| `content/history.js` | ~26 | Debounced persistence |
-| `offscreen.js` | ~400 | Binary parser |
-| `offscreen.html` | ~45 | Offscreen wrapper |
-| `popup.html` | ~120 | Dashboard layout |
-| `popup.css` | ~584 | Elegant dark-mode styling |
-| `popup.js` | ~340 | Dashboard logic |
+| `manifest.json` | 58 | Extension configuration |
+| `background.js` | 196 | Service worker |
+| `content/constants.js` | 73 | Magic numbers, defaults |
+| `content/utils.js` | 103 | Formatting, sanitization |
+| `content/config.js` | 43 | State management |
+| `content/intercept.js` | 184 | Event capture, re-dispatch, processing state |
+| `content/toast.js` | 359 | Shadow DOM toast (badges, spinner, dark mode) |
+| `content/converters.js` | 137 | Text/code/CSV conversion |
+| `content/binary.js` | 71 | Offscreen bridge |
+| `content/postprocess.js` | 102 | YAML, regex, formula injection |
+| `content/history.js` | 24 | Debounced persistence |
+| `offscreen.js` | 416 | Binary parser |
+| `offscreen.html` | 44 | Offscreen wrapper |
+| `popup.html` | 288 | Dashboard layout (AI site search) |
+| `popup.css` | 912 | Dark-mode styling |
+| `popup.js` | 604 | Dashboard logic (search, history sizes) |
 | `lib/` (8 files) | — | Parser libraries |
 | `icons/` (3 files) | — | Extension icons |
 
-**Total executable code:** ~1,698 lines across 14 files  
+**Total source JS:** 2,358 lines across 12 files  
 **Total with libraries:** ~26,000 lines (dominated by PDF.js worker)
 
 ---

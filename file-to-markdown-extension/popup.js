@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     domainBlacklist: [],
     domainWhitelist: [],
     customAiHosts: [],
-    categories: { pdf: true, documents: true, spreadsheets: true, code: true, markup: true, presentations: true },
+    categories: { pdf: true, documents: true, spreadsheets: true, code: true, markup: true, presentations: true, images: true },
     yamlFrontmatter: true,
     csvStreamThreshold: 5,
     stripTrailingWhitespace: true,
@@ -56,9 +56,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Tabs ──
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+      });
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
       document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
     });
   });
@@ -71,7 +75,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       const content = $(contentId);
       
       card.classList.toggle('expanded');
-      if (card.classList.contains('expanded')) {
+      const isExpanded = card.classList.contains('expanded');
+      header.setAttribute('aria-expanded', isExpanded);
+      if (isExpanded) {
         content.style.display = 'block';
       } else {
         content.style.display = 'none';
@@ -98,6 +104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const resetSitesBtn = $('reset-sites-btn');
   const enabledCountEl = $('enabled-count');
   const customCountEl = $('custom-count');
+  const siteSearchInput = $('site-search-input');
 
   function getCustomOverrides() {
     return currentConfig.customAiHosts || [];
@@ -190,6 +197,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     updateSiteStats();
+    applySiteSearchFilter();
+  }
+
+  function applySiteSearchFilter() {
+    const q = (siteSearchInput ? siteSearchInput.value : '').trim().toLowerCase();
+    const groups = siteCategories.querySelectorAll('.site-category-group');
+    groups.forEach(group => {
+      const pills = group.querySelectorAll('.site-pill');
+      let visibleCount = 0;
+      pills.forEach(pill => {
+        const host = pill.querySelector('span')?.textContent?.toLowerCase() || '';
+        if (!q || host.includes(q)) {
+          pill.classList.remove('hidden');
+          visibleCount++;
+        } else {
+          pill.classList.add('hidden');
+        }
+      });
+      group.classList.toggle('hidden', visibleCount === 0);
+    });
+  }
+
+  if (siteSearchInput) {
+    siteSearchInput.addEventListener('input', applySiteSearchFilter);
   }
 
   function toggleBuiltIn(host) {
@@ -212,9 +243,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderAiSites();
   }
 
+  function isValidDomain(domain) {
+    if (!domain || domain.length > 253) return false;
+    if (domain.includes('..') || domain.startsWith('.') || domain.endsWith('.')) return false;
+    if (domain.includes('/') || domain.includes(' ') || domain.includes('@')) return false;
+    return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}$/.test(domain);
+  }
+
   addSiteBtn.addEventListener('click', () => {
     const val = customSiteInput.value.trim().toLowerCase();
     if (!val) return;
+    if (!isValidDomain(val)) {
+      customSiteInput.style.borderColor = 'var(--danger)';
+      setTimeout(() => { customSiteInput.style.borderColor = ''; }, 2000);
+      return;
+    }
     const overrides = [...getCustomOverrides()];
     if (!overrides.includes('+' + val)) {
       overrides.push('+' + val);
@@ -238,7 +281,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ── Config ──
-  const categoryCheckboxes = ['pdf', 'documents', 'spreadsheets', 'code', 'markup', 'presentations'];
+  const categoryCheckboxes = ['pdf', 'documents', 'spreadsheets', 'code', 'markup', 'presentations', 'images'];
 
   async function loadConfig() {
     return new Promise((resolve) => {
@@ -469,7 +512,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     regexContainer.querySelectorAll('.btn-remove, .btn-icon[data-idx]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const i = +e.target.dataset.idx;
+        const i = +e.currentTarget.dataset.idx;
         currentConfig.regexPipeline.splice(i, 1);
         saveConfig({ regexPipeline: currentConfig.regexPipeline });
         renderRegexRules();
@@ -483,6 +526,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     saveConfig({ regexPipeline: currentConfig.regexPipeline });
     renderRegexRules();
   });
+
+  // ── Helpers ──
+  function formatBytesLocal(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
 
   // ── History ──
   function renderHistory() {
@@ -514,6 +564,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       file.className = 'history-file';
       file.textContent = item.file || '';
 
+      const sizeEl = document.createElement('span');
+      sizeEl.className = 'history-size';
+      sizeEl.textContent = item.size ? formatBytesLocal(item.size) : '';
+
       const ext = document.createElement('span');
       ext.className = 'history-ext';
       ext.textContent = (item.extension || '').toUpperCase().replace('.', '');
@@ -523,6 +577,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       t.textContent = timeStr;
 
       row.appendChild(file);
+      row.appendChild(sizeEl);
       row.appendChild(ext);
       row.appendChild(t);
       historyList.appendChild(row);

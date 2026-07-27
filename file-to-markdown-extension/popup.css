@@ -333,6 +333,39 @@ body {
   gap: 12px;
 }
 
+.site-search-row {
+  margin-bottom: 4px;
+}
+
+.site-search-row input[type="text"] {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.site-search-row input[type="text"]::placeholder {
+  color: var(--text-3);
+}
+
+.site-search-row input[type="text"]:focus {
+  border-color: var(--accent);
+}
+
+.site-pill.hidden {
+  display: none;
+}
+
+.site-category-group.hidden {
+  display: none;
+}
+
 .site-input-row {
   display: flex;
   gap: 8px;
@@ -470,7 +503,13 @@ body {
 
 .custom-site-row button:hover {
   color: var(--danger);
-  background: var(--danger)1a;
+  background: #d930251a;
+}
+
+@media (prefers-color-scheme: dark) {
+  .custom-site-row button:hover {
+    background: #f28b821a;
+  }
 }
 
 /* ── Format Toggles ── */
@@ -528,6 +567,11 @@ body {
   opacity: 0.9;
 }
 
+.btn-primary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .btn-secondary {
   display: flex;
   align-items: center;
@@ -547,6 +591,11 @@ body {
 .btn-secondary:hover {
   background: var(--surface-2);
   color: var(--text);
+}
+
+.btn-secondary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .btn-icon {
@@ -569,6 +618,11 @@ body {
   color: #fff;
 }
 
+.btn-icon:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .btn-text {
   font-size: 12px;
   font-weight: 500;
@@ -583,6 +637,11 @@ body {
 
 .btn-text:hover {
   background: var(--accent-soft);
+}
+
+.btn-text:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .btn-text.danger {
@@ -830,6 +889,15 @@ input[type="range"]::-webkit-slider-thumb:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.history-size {
+  font-size: 10px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 48px;
+  text-align: right;
 }
 
 .history-ext {

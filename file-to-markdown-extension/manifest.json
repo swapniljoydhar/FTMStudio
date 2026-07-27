@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
   "name": "FTM Studio",
-  "version": "2.0",
+  "version": "2.0.0",
+  "minimum_chrome_version": "116",
   "description": "Elegant file-to-Markdown converter for AI chatbots. Privacy-first, client-side conversion with a beautiful UI.",
   "permissions": [
     "storage",
@@ -17,14 +18,7 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "lib/mammoth.browser.min.js",
-        "lib/xlsx.mini.min.js",
-        "lib/jszip.min.js",
-        "lib/turndown.min.js",
-        "lib/turndown-plugin-gfm.min.js",
-        "lib/papaparse.min.js",
-        "lib/pdf.min.js",
-        "lib/pdf.worker.min.js"
+        "lib/papaparse.min.js"
       ],
       "matches": ["<all_urls>"]
     }

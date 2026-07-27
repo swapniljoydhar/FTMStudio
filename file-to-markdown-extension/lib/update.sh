@@ -43,7 +43,20 @@ download_lib() {
   local expected_hash="$3"
 
   echo -e "${YELLOW}Downloading${NC} $name..."
-  curl -sL "$url" -o "$LIB_DIR/$name"
+  local http_code
+  http_code=$(curl -sL -w '%{http_code}' -o "$LIB_DIR/$name" "$url")
+
+  if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 400 ]; then
+    echo -e "${RED}DOWNLOAD FAILED${NC} for $name (HTTP $http_code)"
+    rm -f "$LIB_DIR/$name"
+    return 1
+  fi
+
+  if [ ! -s "$LIB_DIR/$name" ]; then
+    echo -e "${RED}DOWNLOAD FAILED${NC} for $name (empty file)"
+    rm -f "$LIB_DIR/$name"
+    return 1
+  fi
 
   local actual
   actual=$(sha256sum "$LIB_DIR/$name" | cut -d' ' -f1)
@@ -64,17 +77,18 @@ if [ $# -eq 0 ]; then
   echo ""
   failures=0
 
-  verify_hash "$LIB_DIR/mammoth.browser.min.js" "596ef52239e52d8ee3cee10b2ee4a72596abf900d0e4f468593f956e9f1809b0" || ((failures++))
+  verify_hash "$LIB_DIR/mammoth.browser.min.js" "7be06532b3edfef02ce8878dcb1d3a473d37f97018450b44b02397943fb76e26" || ((failures++))
   verify_hash "$LIB_DIR/xlsx.mini.min.js" "3120abba1fd0ea031f25ab22ac93e726f6f63467da1a6349b82e82f3df5d775c" || ((failures++))
-  verify_hash "$LIB_DIR/jszip.min.js" "acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e" || ((failures++))
-  verify_hash "$LIB_DIR/turndown.min.js" "fd0e2aa0785c13c39fa1ddc0b3b19520e541b69801c1369ea4aabfe7913a0dea" || ((failures++))
-  verify_hash "$LIB_DIR/pdf.min.js" "5b5799e6f8c680663207ac5b42ee14eed2a406fa7af48f50c154f0c0b1566946" || ((failures++))
-  verify_hash "$LIB_DIR/pdf.worker.min.js" "feabdf309770ed24bba31a5467836cdc8cf639c705af27d52b585b041bb8527b" || ((failures++))
-  verify_hash "$LIB_DIR/papaparse.min.js" "b8e870c5d2b29772f10c9fa9a693c8b896aac8540ed6701e3cc6304c683febdb" || ((failures++))
+  verify_hash "$LIB_DIR/jszip.min.js" "84327f63cf26fafd49b7d318c4a4a4a9d0606228a54f6d6f07e61d1029d694ac" || ((failures++))
+  verify_hash "$LIB_DIR/turndown.min.js" "8744cc00d5299f7a12984db79807947318c4d915a9d73f75acd3e51657ac7e1a" || ((failures++))
+  verify_hash "$LIB_DIR/pdf.min.js" "e0e389e9807b2d82bebd05622e2c699a7a9a3ef279b687c1393d81244b0c31f8" || ((failures++))
+  verify_hash "$LIB_DIR/pdf.worker.min.js" "fd7a073fe718f2a4c2fb95ec0a834e3774ba8ab74ccaf1797a99da6592fcc600" || ((failures++))
+  verify_hash "$LIB_DIR/papaparse.min.js" "5cdfaca6e7f550399be8488c7ef241e028543019a6a26dcca1a5f019775b8e85" || ((failures++))
+  verify_hash "$LIB_DIR/turndown-plugin-gfm.min.js" "fb5bb3316ea198a531f1fb1104553879fd62086841bded17effe324e5571cd95" || ((failures++))
 
   echo ""
   if [ $failures -eq 0 ]; then
-    echo -e "${GREEN}All 7 libraries verified.${NC}"
+    echo -e "${GREEN}All 8 libraries verified.${NC}"
   else
     echo -e "${RED}$failures library(ies) failed verification.${NC}"
     exit 1
@@ -86,8 +100,8 @@ fi
 case "$1" in
   mammoth)
     download_lib "mammoth.browser.min.js" \
-      "https://cdn.jsdelivr.net/npm/mammoth@latest/mammoth.browser.min.js" \
-      "596ef52239e52d8ee3cee10b2ee4a72596abf900d0e4f468593f956e9f1809b0"
+      "https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js" \
+      "7be06532b3edfef02ce8878dcb1d3a473d37f97018450b44b02397943fb76e26"
     ;;
   xlsx)
     download_lib "xlsx.mini.min.js" \
@@ -97,34 +111,39 @@ case "$1" in
   jszip)
     download_lib "jszip.min.js" \
       "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" \
-      "acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e"
+      "84327f63cf26fafd49b7d318c4a4a4a9d0606228a54f6d6f07e61d1029d694ac"
     ;;
   turndown)
     download_lib "turndown.min.js" \
       "https://cdn.jsdelivr.net/npm/turndown@3.4.7/dist/turndown.min.js" \
-      "fd0e2aa0785c13c39fa1ddc0b3b19520e541b69801c1369ea4aabfe7913a0dea"
+      "8744cc00d5299f7a12984db79807947318c4d915a9d73f75acd3e51657ac7e1a"
+    ;;
+  turndown-gfm)
+    download_lib "turndown-plugin-gfm.min.js" \
+      "https://cdn.jsdelivr.net/npm/turndown-plugin-gfm@1.0.2/dist/turndown-plugin-gfm.min.js" \
+      "fb5bb3316ea198a531f1fb1104553879fd62086841bded17effe324e5571cd95"
     ;;
   pdfjs)
     download_lib "pdf.min.js" \
       "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" \
-      "5b5799e6f8c680663207ac5b42ee14eed2a406fa7af48f50c154f0c0b1566946"
+      "e0e389e9807b2d82bebd05622e2c699a7a9a3ef279b687c1393d81244b0c31f8"
     download_lib "pdf.worker.min.js" \
       "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js" \
-      "feabdf309770ed24bba31a5467836cdc8cf639c705af27d52b585b041bb8527b"
+      "fd7a073fe718f2a4c2fb95ec0a834e3774ba8ab74ccaf1797a99da6592fcc600"
     ;;
   papaparse)
     download_lib "papaparse.min.js" \
       "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js" \
-      "b8e870c5d2b29772f10c9fa9a693c8b896aac8540ed6701e3cc6304c683febdb"
+      "5cdfaca6e7f550399be8488c7ef241e028543019a6a26dcca1a5f019775b8e85"
     ;;
   all)
     echo "Updating all libraries..."
-    for lib in mammoth xlsx jszip turndown pdfjs papaparse; do
+    for lib in mammoth xlsx jszip turndown turndown-gfm pdfjs papaparse; do
       $0 "$lib" || echo -e "${YELLOW}Warning: $lib update may have hash mismatch (check CDN)${NC}"
     done
     ;;
   *)
-    echo "Usage: $0 [mammoth|xlsx|jszip|turndown|pdfjs|papaparse|all]"
+    echo "Usage: $0 [mammoth|xlsx|jszip|turndown|turndown-gfm|pdfjs|papaparse|all]"
     echo "  No args = verify all libraries"
     exit 1
     ;;

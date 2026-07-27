@@ -1,15 +1,15 @@
 {
-  "description": "FTM Studio library lockfile — pinned versions with SHA-256 hashes",
-  "updated": "2026-07-26",
+  "description": "FTM Studio library lockfile \u2014 pinned versions with SHA-256 hashes",
+  "updated": "2026-07-27",
   "libraries": {
     "mammoth.browser.min.js": {
-      "version": "unknown",
-      "source": "https://cdn.jsdelivr.net/npm/mammoth@latest/mammoth.browser.min.js",
+      "version": "1.8.0",
+      "source": "https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js",
       "npm": "https://www.npmjs.com/package/mammoth",
-      "sha256": "WW71IjnlLY7jzuELLuSnJZar+QDQ5PRoWT+Vbp8YCbA=",
-      "sha256_hex": "596ef52239e52d8ee3cee10b2ee4a72596abf900d0e4f468593f956e9f1809b0",
+      "sha256": "e+BlMrPt/vAs6IeNyx06Rz03+XAYRQtEsCOXlD+3biY=",
+      "sha256_hex": "7be06532b3edfef02ce8878dcb1d3a473d37f97018450b44b02397943fb76e26",
       "size": 642759,
-      "purpose": "DOCX → semantic HTML"
+      "purpose": "DOCX \u2192 semantic HTML"
     },
     "xlsx.mini.min.js": {
       "version": "0.18.5",
@@ -18,52 +18,61 @@
       "sha256": "MSCruh/Q6gMfJasirJPnJvb2NGfaGmNJuC6C899dd1w=",
       "sha256_hex": "3120abba1fd0ea031f25ab22ac93e726f6f63467da1a6349b82e82f3df5d775c",
       "size": 250826,
-      "purpose": "XLSX/XLS → JSON (read-only)"
+      "purpose": "XLSX/XLS \u2192 JSON (read-only)"
     },
     "jszip.min.js": {
       "version": "3.10.1",
       "source": "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js",
       "npm": "https://www.npmjs.com/package/jszip",
-      "sha256": "rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=",
-      "sha256_hex": "acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e",
-      "size": 97630,
+      "sha256": "hDJ/Y88m+v1Jt9MYxKSkqdBgYiilT21vB+YdECnWlKw=",
+      "sha256_hex": "84327f63cf26fafd49b7d318c4a4a4a9d0606228a54f6d6f07e61d1029d694ac",
+      "size": 97631,
       "purpose": "ZIP archive handling (EPUB, PPTX)"
     },
     "turndown.min.js": {
       "version": "3.4.7",
       "source": "https://cdn.jsdelivr.net/npm/turndown@3.4.7/dist/turndown.min.js",
       "npm": "https://www.npmjs.com/package/turndown",
-      "sha256": "/Q4qoHhcE8Ofod3As7GVIOVBtpgBwTaepKq/55E6Deo=",
-      "sha256_hex": "fd0e2aa0785c13c39fa1ddc0b3b19520e541b69801c1369ea4aabfe7913a0dea",
-      "size": 10489,
-      "purpose": "HTML → Markdown"
+      "sha256": "h0TMANUpn3oSmE23mAeUcxjE2RWp1z91rNPlFlesfho=",
+      "sha256_hex": "8744cc00d5299f7a12984db79807947318c4d915a9d73f75acd3e51657ac7e1a",
+      "size": 10490,
+      "purpose": "HTML \u2192 Markdown"
     },
     "pdf.min.js": {
       "version": "3.11.174",
       "source": "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js",
       "npm": "https://www.npmjs.com/package/pdfjs-dist",
-      "sha256": "W1eZ5vjGgGYyB6xbQu4U7tKkBvp69I9QwVTwwLFWaUY=",
-      "sha256_hex": "5b5799e6f8c680663207ac5b42ee14eed2a406fa7af48f50c154f0c0b1566946",
-      "size": 320004,
+      "sha256": "4OOJ6YB7LYK+vQViLixpmnqaPvJ5tofBOT2BJEsMMfg=",
+      "sha256_hex": "e0e389e9807b2d82bebd05622e2c699a7a9a3ef279b687c1393d81244b0c31f8",
+      "size": 320005,
       "purpose": "PDF text extraction"
     },
     "pdf.worker.min.js": {
       "version": "3.11.174",
       "source": "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js",
       "npm": "https://www.npmjs.com/package/pdfjs-dist",
-      "sha256": "/qvfMJdw7SS7oxpUZ4Ns3Iz2OccFryfVK1hbBBu4Uns=",
-      "sha256_hex": "feabdf309770ed24bba31a5467836cdc8cf639c705af27d52b585b041bb8527b",
-      "size": 1087212,
+      "sha256": "/XoHP+cY8qTC+5XsCoNON3S6irdMyvF5epnaZZL8xgA=",
+      "sha256_hex": "fd7a073fe718f2a4c2fb95ec0a834e3774ba8ab74ccaf1797a99da6592fcc600",
+      "size": 1087213,
       "purpose": "PDF.js web worker"
     },
     "papaparse.min.js": {
       "version": "5.4.1",
       "source": "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js",
       "npm": "https://www.npmjs.com/package/papaparse",
-      "sha256": "uOhwxdKyl3LxDJ+pppPIuJaqyFQO1nAePMYwTGg/69s=",
-      "sha256_hex": "b8e870c5d2b29772f10c9fa9a693c8b896aac8540ed6701e3cc6304c683febdb",
-      "size": 19469,
+      "sha256": "XN+spuf1UDmb6EiMfvJB4ChUMBmmom3MoaXwGXdbjoU=",
+      "sha256_hex": "5cdfaca6e7f550399be8488c7ef241e028543019a6a26dcca1a5f019775b8e85",
+      "size": 19470,
       "purpose": "CSV parsing + streaming"
+    },
+    "turndown-plugin-gfm.min.js": {
+      "version": "1.0.2",
+      "source": "https://cdn.jsdelivr.net/npm/turndown-plugin-gfm@1.0.2/dist/turndown-plugin-gfm.min.js",
+      "npm": "https://www.npmjs.com/package/turndown-plugin-gfm",
+      "sha256": "+1uzMW6hmKUx8fsRBFU4ef1iCGhBve0X7/4yTlVxzZU=",
+      "sha256_hex": "fb5bb3316ea198a531f1fb1104553879fd62086841bded17effe324e5571cd95",
+      "size": 2289,
+      "purpose": "GFM (GitHub Flavored Markdown) plugin for Turndown.js"
     }
   }
 }

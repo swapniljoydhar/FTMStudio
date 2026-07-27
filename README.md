@@ -108,13 +108,13 @@ content/
 ├── converters.js   # Text, CSV, RTF processing + content sniffing
 ├── binary.js       # Offscreen bridge (Transferable Objects)
 ├── history.js      # Conversion history (debounced persistence)
-├── toast.js        # Shadow DOM toast UI
+├── toast.js        # Shadow DOM toast UI (file badges, spinner, search)
 └── intercept.js    # Event interception, dispatch, lifecycle, init
 
 background.js       # Service worker (port routing, lifecycle, config sync)
 offscreen.js        # Ephemeral document (binary parsing: DOCX, XLSX, PDF, EPUB, PPTX)
-popup.html/js/css   # Settings dashboard
-lib/                # Third-party parsers (mammoth, xlsx, pdf.js, jszip, turndown, papaparse)
+popup.html/js/css   # Settings dashboard (AI site search, history with sizes)
+lib/                # Third-party parsers (mammoth, xlsx, pdf.js, jszip, turndown, turndown-plugin-gfm, papaparse)
 ```
 
 ### Data Flow
@@ -159,19 +159,21 @@ lib/                # Third-party parsers (mammoth, xlsx, pdf.js, jszip, turndow
 ### Testing
 
 ```bash
-node test.js
+node test.js            # 87 unit tests
+node test-pipeline.js   # 146 pipeline integration tests
 ```
 
-87 tests covering security-critical functions (ReDoS, CSV injection, YAML injection, domain matching, Smart Mode, heading hierarchy, magic byte detection, regex sanitization).
+233 tests covering security-critical functions (ReDoS, CSV injection, YAML injection, domain matching, Smart Mode, heading hierarchy, magic byte detection, regex sanitization, file routing, state machine, concurrent operations).
 
 ### Library Management
 
 Libraries are pinned in `lib/lockfile.json` with SHA-256 hashes.
 
 ```bash
-./lib/update.sh          # Verify all 7 libraries
-./lib/update.sh pdfjs    # Update PDF.js specifically
-./lib/update.sh all      # Update everything
+./lib/update.sh              # Verify all 8 libraries
+./lib/update.sh pdfjs        # Update PDF.js specifically
+./lib/update.sh turndown-gfm # Update Turndown GFM plugin
+./lib/update.sh all          # Update everything
 ```
 
 ### Project Structure

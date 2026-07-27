@@ -1,7 +1,9 @@
 # User's v1.0.1 Modular Refactoring Notes
 
 ## Architecture Change
-User split monolithic content.js into 9 modules:
+User split monolithic content.js into 9 modules.
+
+**Note (2026-07-27):** The monolithic `content.js` (1,247 lines) has been deleted as dead code. The manifest already loaded only the modular `content/` files. All functionality from `content.js` exists in the 9 modules below.
 1. constants.js — constants, defaults
 2. utils.js — utility functions (formatBytes, sanitizeRegexPipeline, shouldInterceptFile, etc.)
 3. config.js — configuration state + persistence + chrome.storage.onChanged listener

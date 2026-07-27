@@ -1,5 +1,7 @@
 # FTM Studio v6.5.0 — Comprehensive Architecture Audit
 
+> **Historical Document** — This audit was performed before the dead monolithic `content.js` (1,247 lines) was removed. References to `content.js` below describe the pre-fix state.
+
 **Date:** 2026-07-27  
 **Auditor:** Manus AI (Principal Software Engineer)  
 **Repository:** `swapniljoydhar/FTMStudio`
