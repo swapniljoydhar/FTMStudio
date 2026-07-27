@@ -347,6 +347,42 @@ FTMStudio/
 
 ---
 
+## Strengths & Weaknesses
+
+### Strengths
+
+| Strength | Detail |
+|----------|--------|
+| **100% Private** | Zero network requests. No telemetry, no cloud, no tracking. All processing happens locally in the browser. Even the parser libraries are bundled — no CDN calls at runtime. |
+| **Zero Memory Overhead When Idle** | The offscreen document (where heavy parsers run) is created on demand and destroyed immediately after use. When no file is being converted, the extension uses near-zero memory. |
+| **Zero-Copy Binary Transfer** | Transferable Objects move ArrayBuffer ownership instantly without cloning. A 50MB file doesn't temporarily double to 100MB during processing. |
+| **Smart Mode** | Only activates on 200+ known AI platforms by default. Won't intercept uploads on Gmail, banking, government, or social media sites. Reduces attack surface and avoids annoying users. |
+| **Capture-Phase Interception** | Event listeners fire at capture phase, before React/Vue/Svelte synthetic event handlers. This means the extension intercepts files even on heavily-frameworked SPAs. |
+| **Shadow DOM Isolation** | The toast UI uses `mode: 'closed'` Shadow DOM, so host page CSS can't break the extension's styling, and the extension can't leak styles into the page. |
+| **Security-Hardened** | ReDoS protection, CSV formula injection prevention, YAML injection escaping, magic byte validation, fail-closed activation, port race condition guards, message validation. |
+| **Comprehensive Test Suite** | 233 tests (87 unit + 146 integration) covering security-critical paths, file routing, state machine, concurrent operations, and edge cases. |
+| **Library Integrity Verification** | All 8 parser libraries pinned with SHA-256 hashes in `lockfile.json`. `update.sh` verifies integrity before and after updates. |
+| **Modular Architecture** | 9 focused content script modules with clear single responsibilities. Each module can be understood, tested, and maintained independently. |
+| **Graceful Degradation** | If Papa Parse isn't loaded, CSV falls back to a built-in parser. If a binary conversion fails, the original file is re-dispatched so the upload still works. |
+| **Accessibility** | ARIA labels, roles, expanded states on all interactive elements. Focus-visible styles for keyboard navigation. Screen reader compatible. |
+
+### Weaknesses
+
+| Weakness | Detail | Impact |
+|----------|--------|--------|
+| **Text-Only PDF Extraction** | PDF.js extracts text content only. Scanned PDFs (image-based), password-protected PDFs, and PDFs with complex layouts (tables, multi-column) produce poor output. | Medium — common use case with degraded quality |
+| **No DOCX Visual Layout** | Mammoth.js extracts semantic HTML from DOCX, not visual layout. Tables, images, headers/footers, and complex formatting are lost or simplified. | Medium — output differs from visual appearance |
+| **No DRM/Protected Content** | DRM-protected EPUBs, encrypted PDFs, and password-protected Office files cannot be processed. | Low — expected limitation, no workaround possible |
+| **ReDoS Protection Has Gaps** | Timing-based checker uses 30-char test strings. Bounded nested quantifiers like `(a{1,10}){1,10}` pass the check but can cause exponential backtracking on longer inputs. | Low — mitigated by 2MB text length guard |
+| **`<all_urls>` Host Permission** | The extension requests permission to run on all websites (required for Smart Mode to work). While Smart Mode limits actual activation, the permission itself is broad. | Low — necessary for the feature set |
+| **Single-File Processing** | Each file upload is processed one at a time. Multi-file uploads (e.g., `<input multiple>`) only intercept the first file. | Low — most AI chatbots accept one file at a time |
+| **No Streaming for Binary Files** | Binary files (DOCX, PDF, XLSX) are fully loaded into memory before processing. Very large files (near the 50MB limit) may cause temporary memory spikes. | Low — 50MB cap prevents extreme cases |
+| **RTF Parser Is Basic** | Regex-based RTF stripping handles common cases but fails on complex RTF with nested groups, embedded objects, or OLE elements. | Low — RTF is increasingly rare |
+| **No Offline Installation** | Libraries are bundled in the extension, so it works offline. However, the `update.sh` tool requires internet to download library updates. | Negligible — only affects development |
+| **Chrome-Only** | Uses Chrome-specific APIs (offscreen documents, `chrome.runtime.getContexts`). Not compatible with Firefox, Safari, or Edge (without Chromium). | Low — Chrome has ~65% browser market share |
+
+---
+
 ## Known Limitations
 
 | Format | Limitation |
