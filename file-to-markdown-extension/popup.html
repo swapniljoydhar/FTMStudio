@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FTM Studio</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <!-- Splash Intro -->
+  <div class="splash" id="splash">
+    <div class="splash-icon">
+      <div class="splash-dot"></div>
+      <div class="splash-icon-shape"></div>
+      <div class="splash-hash">#</div>
+    </div>
+    <div class="splash-title">FTM Studio</div>
+  </div>
+
+  <div class="app" id="app">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-mark">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+        </div>
+        <div>
+          <h1>FTM Studio</h1>
+          <div class="header-meta"><span class="version" id="version-badge"></span><span class="save-status" id="save-status" aria-live="polite"></span></div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="status-pill" id="status-pill">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-label">Active</span>
+        </div>
+        <label class="toggle" title="Enable or disable FTM Studio">
+          <input type="checkbox" id="master-toggle" checked>
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </label>
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="general" role="tab" aria-selected="true" aria-controls="panel-general">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        General
+      </button>
+      <button class="tab" data-tab="sites" role="tab" aria-selected="false" aria-controls="panel-sites">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Sites
+      </button>
+      <button class="tab" data-tab="advanced" role="tab" aria-selected="false" aria-controls="panel-advanced">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        Advanced
+      </button>
+      <button class="tab" data-tab="history" role="tab" aria-selected="false" aria-controls="panel-history">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        History
+      </button>
+    </nav>
+
+    <!-- ═══ GENERAL ═══ -->
+    <div class="panel active" id="panel-general" role="tabpanel" aria-label="General settings">
+
+      <section class="hero-card" aria-labelledby="hero-title">
+        <div class="hero-icon" aria-hidden="true">#</div>
+        <div>
+          <h2 id="hero-title">Files to Markdown, locally</h2>
+          <p>Drop a file into a supported AI chat and FTM Studio converts it on your device.</p>
+        </div>
+      </section>
+
+      <!-- Behavior — always visible, compact -->
+      <section class="card">
+        <div class="card-body">
+          <label class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">Smart Mode</span>
+              <span class="setting-hint">Only intercept on AI &amp; chatbot sites</span>
+            </div>
+            <input type="checkbox" id="smart-mode" checked class="switch">
+          </label>
+          <label class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">Auto-Convert</span>
+              <span class="setting-hint">Skip the prompt, convert instantly</span>
+            </div>
+            <input type="checkbox" id="auto-convert" class="switch">
+          </label>
+        </div>
+      </section>
+
+      <!-- Output — collapsible, collapsed by default -->
+      <section class="card collapsible" id="card-output">
+        <button class="card-header-toggle" aria-expanded="false" aria-controls="output-body">
+          <div class="card-label">Output</div>
+          <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="card-body collapse-body" id="output-body">
+          <label class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">YAML Frontmatter</span>
+              <span class="setting-hint">Add metadata header to output</span>
+            </div>
+            <input type="checkbox" id="yaml-toggle" checked class="switch">
+          </label>
+          <label class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">Preserve Original MIME</span>
+              <span class="setting-hint">Use source file's MIME type (helps with picky upload validators)</span>
+            </div>
+            <input type="checkbox" id="preserve-mime" class="switch">
+          </label>
+        </div>
+      </section>
+
+      <!-- File Formats — collapsible, collapsed by default -->
+      <section class="card collapsible" id="card-formats">
+        <button class="card-header-toggle" aria-expanded="false" aria-controls="formats-body">
+          <div class="card-label">File Formats</div>
+          <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="card-body collapse-body" id="formats-body">
+          <div id="format-toggles-container">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ═══ SITES ═══ -->
+    <div class="panel" id="panel-sites" role="tabpanel" aria-label="Supported sites">
+
+      <section class="card">
+        <div class="card-body">
+          <div class="search-box">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="site-search-input" placeholder="Search 200+ AI platforms\u2026" />
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-body">
+          <div class="inline-input-row">
+            <input type="text" id="custom-site-input" placeholder="Add custom site (e.g., my-ai.com)" />
+            <button class="btn-add" id="add-site-btn" aria-label="Add custom site">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <div class="site-stats">
+            <span><strong id="enabled-count">0</strong> enabled</span>
+            <span class="dot">\u00B7</span>
+            <span><strong id="custom-count">0</strong> custom</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-body scrollable" id="site-categories">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <div id="custom-sites-list"></div>
+
+      <button class="btn-ghost full-width" id="reset-sites-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        Reset to Defaults
+      </button>
+
+      <section class="card">
+        <div class="card-label">Blocked Domains</div>
+        <div class="card-body">
+          <textarea id="blacklist-textarea" rows="2" placeholder="example.com&#10;internal-tool.net"></textarea>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ═══ ADVANCED ═══ -->
+    <div class="panel" id="panel-advanced" role="tabpanel" aria-label="Advanced settings">
+
+      <section class="card">
+        <div class="card-label">CSV Processing</div>
+        <div class="card-body">
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">Stream Threshold</span>
+              <span class="setting-hint">Files larger than this use streaming</span>
+            </div>
+            <span class="setting-value" id="csv-threshold-value">5 MB</span>
+          </div>
+          <input type="range" id="csv-threshold-slider" min="1" max="50" value="5" step="1">
+          <div class="range-labels"><span>1 MB</span><span>50 MB</span></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-label">Cleanup</div>
+        <div class="card-body">
+          <label class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">Strip Trailing Whitespace</span>
+            </div>
+            <input type="checkbox" id="opt-strip-trailing" checked class="switch">
+          </label>
+          <label class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">Enforce Heading Hierarchy</span>
+            </div>
+            <input type="checkbox" id="opt-heading-hierarchy" class="switch">
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header-row">
+          <div class="card-label">Regex Rules</div>
+          <button class="btn-icon-sm" id="btn-add-regex" title="Add rule" aria-label="Add regex rule">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+        <div class="card-body">
+          <div id="regex-rules-container"></div>
+          <details class="help-collapse">
+            <summary>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              How rules work
+            </summary>
+            <div class="help-body">
+              <p>Rules run sequentially on the final Markdown output.</p>
+              <pre><code>Pattern:  https://example\.com/(\w+)
+Replace:  [$1](https://example.com/$1)
+Flags:    g</code></pre>
+            </div>
+          </details>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ═══ HISTORY ═══ -->
+    <div class="panel" id="panel-history" role="tabpanel" aria-label="Conversion history">
+
+      <section class="card">
+        <div class="card-header-row">
+          <div class="card-label">Conversion Log</div>
+          <div class="action-group">
+            <button class="btn-ghost-sm" id="btn-export-history">Export</button>
+            <button class="btn-ghost-sm danger" id="btn-clear-history">Clear</button>
+          </div>
+        </div>
+        <div class="card-body" id="history-list">
+          <div class="empty-state">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p>No conversions yet</p>
+            <span>Drop a file on any AI chatbot to start</span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+  </div>
+  <script src="shared/constants.js"></script>
+  <script src="shared/text.js"></script>
+  <script src="shared/config.js"></script>
+  <script src="shared/messages.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

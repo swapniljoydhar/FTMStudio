@@ -1,0 +1,94 @@
+{
+  "description": "FTM Studio library lockfile — pinned versions with SHA-256 hashes",
+  "updated": "2026-07-27",
+  "libraries": {
+    "mammoth.browser.min.js": {
+      "version": "1.8.0",
+      "source": "https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js",
+      "npm": "https://www.npmjs.com/package/mammoth",
+      "sha256_hex": "7be06532b3edfef02ce8878dcb1d3a473d37f97018450b44b02397943fb76e26",
+      "size": 642759,
+      "purpose": "DOCX → semantic HTML"
+    },
+    "xlsx.mini.min.js": {
+      "version": "0.20.3",
+      "source": "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js",
+      "npm": "https://cdn.sheetjs.com/",
+      "sha256_hex": "0cb353f830d7288385492c83d277b058ddeac664ca51cf1393aa1fd3e2b70939",
+      "size": 279523,
+      "purpose": "XLSX/XLS → JSON (read-only); fixes prototype-pollution advisory in 0.18.5"
+    },
+    "jszip.min.js": {
+      "version": "3.10.1",
+      "source": "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js",
+      "npm": "https://www.npmjs.com/package/jszip",
+      "sha256_hex": "84327f63cf26fafd49b7d318c4a4a4a9d0606228a54f6d6f07e61d1029d694ac",
+      "size": 97631,
+      "purpose": "ZIP archive handling (EPUB, PPTX)"
+    },
+    "turndown.min.js": {
+      "version": "7.2.0",
+      "source": "https://cdn.jsdelivr.net/npm/turndown@7.2.0/dist/turndown.min.js",
+      "npm": "https://www.npmjs.com/package/turndown",
+      "sha256_hex": "d418030988bdda974c5cea208a9730c7d05060d45d92e597452c322a68e2e6d7",
+      "size": 10958,
+      "purpose": "HTML → Markdown (the previously pinned 3.4.7 does not exist on npm)"
+    },
+    "turndown-plugin-gfm.min.js": {
+      "version": "1.0.2",
+      "source": "https://cdn.jsdelivr.net/npm/turndown-plugin-gfm@1.0.2/dist/turndown-plugin-gfm.min.js",
+      "npm": "https://www.npmjs.com/package/turndown-plugin-gfm",
+      "sha256_hex": "fb5bb3316ea198a531f1fb1104553879fd62086841bded17effe324e5571cd95",
+      "size": 2289,
+      "purpose": "GFM tables/strikethrough plugin for Turndown"
+    },
+    "pdf.min.mjs": {
+      "version": "4.10.38",
+      "source": "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.min.mjs",
+      "npm": "https://www.npmjs.com/package/pdfjs-dist",
+      "sha256_hex": "44ec6f011027ee77791386b66c14876a5fc29e20bf0433c07c6726fff7212b72",
+      "size": 398237,
+      "purpose": "PDF text extraction; fixes CVE-2024-4367 (arbitrary JS execution) in 3.11.174"
+    },
+    "pdf.worker.min.mjs": {
+      "version": "4.10.38",
+      "source": "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.mjs",
+      "npm": "https://www.npmjs.com/package/pdfjs-dist",
+      "sha256_hex": "bd88805178a26c729db8c0107a5b630cb900ec070f4d8c7529a3e45530afd41d",
+      "size": 1417586,
+      "purpose": "PDF.js module worker"
+    },
+    "papaparse.min.js": {
+      "version": "5.4.1",
+      "source": "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js",
+      "npm": "https://www.npmjs.com/package/papaparse",
+      "sha256_hex": "5cdfaca6e7f550399be8488c7ef241e028543019a6a26dcca1a5f019775b8e85",
+      "size": 19470,
+      "purpose": "CSV parsing (offscreen document only)"
+    },
+    "tesseract/tesseract.min.js": {
+      "version": "5.1.1",
+      "source": "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js",
+      "npm": "https://www.npmjs.com/package/tesseract.js",
+      "sha256_hex": "a8e29918d098b2b06e1012bdaeffb4aec0445c5d5654709023e0bd1f442a80e8",
+      "size": 66695,
+      "purpose": "OCR engine API (lazy-loaded for scanned PDFs only)"
+    },
+    "tesseract/worker.min.js": {
+      "version": "5.1.1",
+      "source": "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
+      "npm": "https://www.npmjs.com/package/tesseract.js",
+      "sha256_hex": "aca1229639fc9907d86f96e825955a2b7c5716d17f3bc3acd71f9c7ab66181fc",
+      "size": 123724,
+      "purpose": "OCR Web Worker (lazy-loaded for scanned PDFs only)"
+    },
+    "tesseract/langs/eng.traineddata.gz": {
+      "version": "4.0.0_best_int",
+      "source": "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz",
+      "npm": "https://www.npmjs.com/package/@aspect-build/aspect-tesseract",
+      "sha256_hex": "45b4cb346724ac1774f1c36f42f182b887bcdb28ebe63e6fff90ac41f3fcff91",
+      "size": 2952873,
+      "purpose": "English language trained data for OCR (lazy-loaded for scanned PDFs only)"
+    }
+  }
+}
