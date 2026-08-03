@@ -61,11 +61,12 @@
     }
   }
 
-  function streamTable(text) {
+  function streamTable(bytes) {
     const Papa = self.Papa;
     const writer = new TableWriter();
+    const source = new Blob([bytes], { type: 'text/csv' });
     return new Promise((resolve, reject) => {
-      Papa.parse(text, {
+      Papa.parse(source, {
         skipEmptyLines: true,
         chunkSize: FTM.CONSTANTS.MB,
         // Papa passes the parser as the second argument; the old code called
@@ -81,8 +82,8 @@
 
   async function parseCsv(bytes, meta) {
     await FTM.libs.get('papa');
-    const text = decode(bytes);
-    return meta.streaming ? streamTable(text) : bufferedTable(text);
+    if (meta.streaming) return streamTable(bytes);
+    return bufferedTable(decode(bytes));
   }
 
   FTM.parsers = FTM.parsers || {};

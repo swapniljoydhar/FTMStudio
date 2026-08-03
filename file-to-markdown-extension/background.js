@@ -53,7 +53,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   return seedConfig(details.reason).then(() => serializedSync(configCache));
 });
 
-chrome.runtime.onStartup.addListener(() => { serializedSync(); });
+chrome.runtime.onStartup.addListener(() => serializedSync());
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== FTM.PORT.CONTENT || (FTM.messages && !FTM.messages.isTrustedPort(port))) return;
@@ -124,5 +124,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // Set initial badge on install/startup.
 chrome.storage.local.get('enabled', (result) => {
+  if (chrome.runtime.lastError) {
+    updateBadge(true);
+    return;
+  }
   updateBadge(result.enabled !== false);
 });

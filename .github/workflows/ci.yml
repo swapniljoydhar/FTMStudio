@@ -1,0 +1,31 @@
+name: Validate extension
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test
+      - name: Run lint
+        run: npm run lint
+      - name: Verify MV3 build
+        run: npm run build
+      - name: Verify pinned libraries
+        run: npm run verify:libs
