@@ -105,8 +105,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
-chrome.runtime.onSuspend.addListener(() => { FTM.offscreen.close(); });
-
 // ── Toolbar badge: green dot when ON, gray when OFF ────────────────
 function updateBadge(enabled) {
   try {

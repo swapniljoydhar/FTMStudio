@@ -17,7 +17,7 @@
 
 ## Verification
 
-- Manifest V3 service worker remains unchanged and valid.
+- Manifest V3 service worker remains valid and uses supported lifecycle handling.
 - No `innerHTML`, `document.write`, `eval`, or `new Function` exists in first-party code.
 - All port senders remain sender-ID validated.
 - All parser libraries remain local and lazily loaded.
