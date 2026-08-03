@@ -1,6 +1,6 @@
 # FTM Studio — Current Architecture Audit
 
-**Updated:** 2026-08-02  
+**Updated:** 2026-08-03
 **Manifest:** Chrome Manifest V3  
 **Status:** Modular, locally processed, test-covered
 
@@ -32,6 +32,10 @@ Content scripts are registered dynamically by `sw/registrar.js` in the isolated 
 - `npm test`: 87 passing
 - `npm run lint`: passing
 - `npm run build`: passing
+- `npm run verify:libs`: 11 pinned libraries verified
 - Dynamic script and manifest file references: verified
+
+Licensing is documented in `LICENSE`, `NOTICE.md`, and the `package.json`
+SPDX field. Bundled libraries retain their upstream licenses.
 
 The broad `<all_urls>` host permission remains because Classic Mode must support interception on arbitrary sites. Smart Mode limits actual registration and activation to configured hosts.

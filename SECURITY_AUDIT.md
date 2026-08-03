@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | **Extension** | FTM Studio v3.0 |
-| **Audit Date** | 2026-08-02 |
+| **Audit Date** | 2026-08-03 |
 | **Overall Risk** | **LOW** |
 | **Critical** | 0 found (3 fixed) |
 | **High** | 0 found (9 fixed) |
@@ -134,8 +134,8 @@
 | PDF password-protected | Medium | Clear error message | ✅ Fixed |
 | Domain blacklist bypass | Low | Exact/suffix hostname matching | ✅ Fixed |
 | Offscreen creation race | Low | Promise-based mutex | ✅ Fixed |
-| `<all_urls>` permission | Low | Required for explicit Classic Mode; Smart Mode registers only configured hosts | Acceptable |
-| SRI hash drift on lib update | Low | Documented in lockfile.json | Acceptable |
+| `<all_urls>` permission | Low | Required for explicit Classic Mode; Smart Mode registers only configured hosts | Accepted |
+| Library hash drift | Low | SHA-256 lockfile and `npm run verify:libs` | Accepted |
 
 ---
 
@@ -192,8 +192,11 @@
 FTM Studio v3.0 addresses all identified security threats with defense-in-depth strategies. The extension maintains 100% local processing with zero network requests, privacy-safe history, and progressive security hardening.
 
 **Risk Rating:** LOW  
-**Open Items:** 2 Low-severity (acceptable)
+**Accepted low-risk items:** `<all_urls>` remains required for explicit Classic Mode; vendor integrity is enforced by the library lockfile.
+
+Licensing and third-party attribution are documented in [LICENSE](LICENSE),
+[NOTICE.md](NOTICE.md), and the SPDX `license` field in `package.json`.
 
 ---
 
-*Audit: 2026-08-02 · Version: 3.0.0 · Tests: 87 passing*
+*Audit: 2026-08-03 · Version: 3.0.0 · Tests: 87 passing*

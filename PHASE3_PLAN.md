@@ -1,6 +1,6 @@
 # Phase 3 — Rewrite and Verification Record
 
-**Updated:** 2026-08-02  
+**Updated:** 2026-08-03
 **Target:** `file-to-markdown-extension/`
 
 ## Completed changes
@@ -21,6 +21,8 @@
 - No `innerHTML`, `document.write`, `eval`, or `new Function` exists in first-party code.
 - All port senders remain sender-ID validated.
 - All parser libraries remain local and lazily loaded.
+- Vendor versions and SHA-256 hashes are verified by `npm run verify:libs`.
+- Apache-2.0 licensing and third-party attribution are documented in `LICENSE` and `NOTICE.md`.
 - 87 tests pass and ESLint reports zero errors.
 
 The unrestricted host permission is retained because Classic Mode is an explicit feature that must work on arbitrary sites. Smart Mode continues to restrict dynamic registration and activation.

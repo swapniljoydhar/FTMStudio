@@ -2,7 +2,7 @@
 
 **Version:** 3.0.0  
 **Architecture:** Manifest V3 Chrome Extension  
-**Status:** Production-Ready, Security-Hardened, Accessible  
+**Status:** Release-ready, security-hardened, accessible
 **Tests:** 87 passing, lint clean
 
 ---
@@ -32,14 +32,14 @@ The extension solves a UX problem: when uploading files to AI chatbots (ChatGPT,
 
 ### Streaming Binary Transport
 
-Files stream via `file.slice()` — only one 512KB chunk in memory at a time:
+Files stream via `file.slice()` — transport keeps only one 512KB chunk in flight:
 
 ```
 Sender (content):  file.slice(0, 512KB) → base64 → send → GC
 Receiver (offscreen):  chunk → fromBase64 → bounded offset write
 ```
 
-Peak RAM is bounded by the declared file size plus parser overhead; repeated full-buffer copies were removed.
+The receiver uses a single bounded buffer where a parser requires random access; repeated buffer growth was removed.
 
 ---
 
@@ -109,15 +109,19 @@ Peak RAM is bounded by the declared file size plus parser overhead; repeated ful
 
 | Metric | Old | New |
 |--------|-----|-----|
-| Peak RAM (45MB PDF) | ~150MB | Bounded by file size + parser overhead |
-| Chunks in memory | All at once | 1 at a time (512KB) |
-| Base64 overhead | 2.67× file size | 1.33× (incremental decode) |
-| ReDoS probe time | Up to 200ms | Max 45ms |
-| Bundle size | ~6MB | ~6MB (Tesseract lazy-loaded) |
+| Memory strategy | Repeated growth and copies | One bounded receiver buffer plus parser working set |
+| Transport chunking | Unbounded buffering risk | One 512KB chunk in flight |
+| ReDoS probe budget | Up to 200ms | Max 45ms |
+| Parser loading | Eager heavy parser loading | Lazy loading; OCR assets only for scanned PDFs |
 
 ---
 
-## Dependencies
+## Dependencies and licensing
+
+Bundled dependency versions and SHA-256 hashes are tracked in
+`file-to-markdown-extension/lib/lockfile.json`. License identifiers and
+upstream attribution are listed in [NOTICE.md](NOTICE.md); the original FTM
+Studio source is licensed under [Apache-2.0](LICENSE).
 
 | Library | Size | Purpose |
 |---------|------|---------|

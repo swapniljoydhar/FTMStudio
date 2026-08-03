@@ -128,7 +128,7 @@ FTM Studio sits quietly in your browser and watches for file uploads. When you d
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Layer 1: Content Script (runs on every page)       │
+│  Layer 1: Content Script (registered when enabled)  │
 │  shared/{constants,text,config}.js                  │
 │  content/{config,activation,postprocess}.js         │
 │  content/{converters,transport,router}.js           │
@@ -160,13 +160,13 @@ Files stream via `file.slice()` — only one 512KB chunk in memory at a time:
 
 ```
 Sender (content script):          Receiver (offscreen):
-  file.slice(0, 512KB)              chunk 1 → fromBase64 → append
-  → base64 → send → GC              chunk 2 → fromBase64 → append
-  file.slice(512KB, 1MB)             chunk 3 → fromBase64 → append
-  → base64 → send → GC              ... → full Uint8Array → parser
+  file.slice(0, 512KB)              chunk 1 → decode → bounded write
+  → base64 → send → release         chunk 2 → decode → bounded write
+  file.slice(512KB, 1MB)             chunk 3 → decode → bounded write
+  → base64 → send → release         ... → parser input
 ```
 
-Peak RAM is bounded by the declared file size plus parser overhead; chunks are not repeatedly copied during reassembly.
+Transport memory is bounded to one chunk at a time; the receiver uses one declared-size buffer for formats that require random access.
 
 ---
 
@@ -219,7 +219,7 @@ Click the extension icon to open the settings dashboard with collapsible section
 - **No network requests** — 100% local processing
 - **No telemetry** — zero analytics or tracking
 - **No cloud storage** — config in `chrome.storage.local`
-- **Ephemeral offscreen** — parser libraries unloaded after each conversion
+- **Ephemeral offscreen** — the document closes and releases parser state when idle
 - **Privacy-safe history** — filenames stored as extension patterns only, 30-day auto-expiry
 
 ### Threat Mitigations
@@ -297,6 +297,8 @@ FTMStudio/
 ├── test/                          # 87 node:test cases
 ├── package.json
 ├── README.md
+├── LICENSE
+├── NOTICE.md
 └── SECURITY_AUDIT.md
 ```
 
