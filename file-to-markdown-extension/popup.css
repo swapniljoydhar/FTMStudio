@@ -1100,12 +1100,28 @@ input[type="range"]::-webkit-slider-thumb {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 0;
+  padding: 8px 6px;
+  margin: 0 -6px;
   min-width: 0;
+  border-radius: 7px;
+  transition: background-color .15s ease, transform .15s ease;
+}
+
+.history-item:hover {
+  background: var(--surface-2);
+  transform: translateX(2px);
 }
 
 .history-item + .history-item {
   border-top: 1px solid var(--border);
+}
+
+.history-item + .history-item:hover {
+  border-top-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .history-item { transition: none; }
 }
 
 .history-file {

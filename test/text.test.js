@@ -93,6 +93,17 @@ test('rtfToMarkdown handles nested groups with formatting', () => {
   assert.match(md, /and/);
 });
 
+test('rtfToMarkdown rejects excessive nesting instead of growing the stack', () => {
+  const { FTM } = loadShared();
+  const nested = '{'.repeat(FTM.CONSTANTS.MAX_RTF_GROUP_DEPTH + 1) + 'x' + '}'.repeat(FTM.CONSTANTS.MAX_RTF_GROUP_DEPTH + 1);
+  assert.throws(() => FTM.text.rtfToMarkdown(nested), /depth limit/i);
+});
+
+test('rtfToMarkdown rejects excessive token counts', () => {
+  const { FTM } = loadShared();
+  assert.throws(() => FTM.text.rtfToMarkdown('x'.repeat(FTM.CONSTANTS.MAX_RTF_TOKENS + 1)), /token limit/i);
+});
+
 test('rtfToMarkdown skips non-content groups', () => {
   const md = T.rtfToMarkdown('{\\rtf1\\fonttbl{\\f0 Times;}{\\f1 Arial;}Hello\\par World}');
   assert.match(md, /Hello\nWorld/);

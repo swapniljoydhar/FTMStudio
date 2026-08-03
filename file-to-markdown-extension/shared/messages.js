@@ -22,11 +22,15 @@
   };
   const validError = (message) => validType(message, FTM.MSG.ERROR) && isObject(message.data)
     && typeof message.data.error === 'string' && message.data.error.length <= 1024;
+  const validAck = (message) => validType(message, FTM.MSG.ACK) && isObject(message.data)
+    && Number.isInteger(message.data.index) && message.data.index >= 1
+    && message.data.index <= Math.ceil(FTM.CONSTANTS.MAX_FILE_SIZE_BYTES / FTM.CONSTANTS.TRANSFER_CHUNK_BYTES);
   FTM.messages = {
     isTrustedPort(port) { return !!(port && port.sender && port.sender.id === chrome.runtime.id); },
     fromContent(message) { return validBegin(message) || validChunk(message) || validError(message) || validType(message, FTM.MSG.END); },
     fromOffscreen(message) {
       if (validError(message)) return true;
+      if (validAck(message)) return true;
       return validType(message, FTM.MSG.RESULT) && isObject(message.data)
       && typeof message.data.markdown === 'string' && message.data.markdown.length <= FTM.CONSTANTS.MAX_FILE_SIZE_BYTES * 4;
     }

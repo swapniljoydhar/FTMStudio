@@ -138,8 +138,10 @@ test('offscreen session reassembles chunks and dispatches to the parser', async 
   session.handle({ type: FTM.MSG.END });
   await new Promise((r) => setTimeout(r, 5));
   assert.deepEqual([...seen[0]], [5, 'a.docx']);
-  assert.equal(port.sent[0].type, FTM.MSG.RESULT);
-  assert.equal(port.sent[0].data.markdown, '# done');
+  assert.deepEqual(port.sent.filter((message) => message.type === FTM.MSG.ACK).map((message) => message.data.index), [1, 2, 3]);
+  const result = port.sent.find((message) => message.type === FTM.MSG.RESULT);
+  assert.ok(result);
+  assert.equal(result.data.markdown, '# done');
 });
 
 test('offscreen session reports incomplete and malformed transfers', async () => {

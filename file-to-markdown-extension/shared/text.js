@@ -122,6 +122,12 @@
       const stack = [];     // [{ws, bold, italic}] per group depth
       let activeBold = false;
       let activeItalic = false;
+      let tokenCount = 0;
+
+      function consumeToken() {
+        tokenCount++;
+        if (tokenCount > FTM.CONSTANTS.MAX_RTF_TOKENS) throw new Error('RTF input exceeds the parser token limit.');
+      }
 
       // Control words that produce output.
       const WORDS = {
@@ -143,6 +149,7 @@
       ]);
 
       function push() {
+        if (stack.length >= FTM.CONSTANTS.MAX_RTF_GROUP_DEPTH) throw new Error('RTF nesting exceeds the parser depth limit.');
         stack.push({ ws, bold, italic });
       }
 
@@ -175,8 +182,12 @@
         do {
           let depth = 0;
           while (i < len) {
+            consumeToken();
             const c = src[i]; i++;
-            if (c === '{') depth++;
+            if (c === '{') {
+              depth++;
+              if (depth > FTM.CONSTANTS.MAX_RTF_GROUP_DEPTH) throw new Error('RTF nesting exceeds the parser depth limit.');
+            }
             else if (c === '}') { depth--; if (depth <= 0) break; }
           }
           // Skip whitespace between consecutive groups.
@@ -185,6 +196,7 @@
       }
 
       while (i < len) {
+        consumeToken();
         const ch = src[i];
 
         if (ch === '\\') {

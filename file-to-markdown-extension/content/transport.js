@@ -22,6 +22,7 @@
       this.options = options || {};
       this.port = null;
       this.timer = null;
+      this.waitingAck = null;
     }
 
     send(message) {
@@ -31,6 +32,13 @@
     onMessage(message, resolve, reject) {
       if (FTM.messages && !FTM.messages.fromOffscreen(message)) return;
       if (!message || typeof message.type !== 'string') return;
+      if (message.type === FTM.MSG.ACK) {
+        const ack = this.waitingAck;
+        if (!ack || message.data.index !== ack.index) return;
+        this.waitingAck = null;
+        this.readNextChunk(ack.offset, ack.index, ack.size, ack.chunkSize);
+        return;
+      }
       if (message.type === FTM.MSG.RESULT) resolve(message.data.markdown);
       else if (message.type === FTM.MSG.ERROR) reject(new Error(message.data.error || 'Conversion failed'));
       else return;
@@ -41,17 +49,17 @@
       if (this.timer) { clearTimeout(this.timer); this.timer = null; }
       try { if (this.port) this.port.disconnect(); } catch (_) {}
       this.port = null;
+      this.waitingAck = null;
     }
 
     // ── Streaming send ──────────────────────────────────────────────────
     // Reads the file in 512 KB slices, converts each to base64, and sends
-    // it immediately.  Only one slice is alive at a time — the previous
-    // ArrayBuffer is unreachable once the CHUNK message is posted, so the
-    // GC can reclaim it before the next read.
+    // it only after the previous chunk is acknowledged.  This prevents
+    // chrome.runtime.Port from queueing multiple cloned base64 payloads.
     sendStreaming() {
       const size = this.file.size;
       const chunkSize = FTM.CONSTANTS.TRANSFER_CHUNK_BYTES;
-      const totalChunks = Math.max(1, Math.ceil(size / chunkSize));
+      const totalChunks = Math.ceil(size / chunkSize);
       this.send({ type: FTM.MSG.BEGIN, data: {
         fileName: this.file.name, extension: this.extension, size, totalChunks, ...this.options
       } });
@@ -59,6 +67,7 @@
     }
 
     readNextChunk(offset, index, size, chunkSize) {
+      if (!this.port) return;
       const readNext = () => {
         if (offset >= size) {
           this.send({ type: FTM.MSG.END });
@@ -69,10 +78,11 @@
         offset = end;
         index++;
         slice.arrayBuffer().then((buffer) => {
+          if (!this.port) return;
           const bytes = new Uint8Array(buffer);
           const base64 = FTM.text.toBase64(bytes);
+          this.waitingAck = { offset, index, size, chunkSize };
           this.send({ type: FTM.MSG.CHUNK, data: { base64, index } });
-          readNext();
         }).catch((err) => {
           this.send({ type: FTM.MSG.ERROR, data: { error: 'Read failed: ' + (err.message || err) } });
           this.close();

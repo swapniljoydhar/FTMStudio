@@ -56,8 +56,20 @@ test('binary transport frames a file as BEGIN / CHUNK* / END', async () => {
     }
   };
   const promise = FTM.transport.convert(file, '.docx');
-  // Wait for all async slice reads to complete.
-  await new Promise((r) => setTimeout(r, 100));
+  let acknowledged = 0;
+  await new Promise((resolve) => {
+    const pump = () => {
+      const chunks = sent.filter((m) => m.type === FTM.MSG.CHUNK);
+      if (chunks.length > acknowledged) {
+        const chunk = chunks[chunks.length - 1];
+        acknowledged = chunks.length;
+        handlers.message({ type: FTM.MSG.ACK, data: { index: chunk.data.index } });
+      }
+      if (sent[sent.length - 1] && sent[sent.length - 1].type === FTM.MSG.END) resolve();
+      else setTimeout(pump, 0);
+    };
+    pump();
+  });
   handlers.message({ type: FTM.MSG.RESULT, data: { markdown: '# ok' } });
   assert.equal(await promise, '# ok');
 
@@ -68,6 +80,23 @@ test('binary transport frames a file as BEGIN / CHUNK* / END', async () => {
   assert.ok(chunks.length > 1, 'large payloads must be chunked');
   const joined = FTM.text.decodeChunks(chunks.map((c) => c.data.base64));
   assert.deepEqual([...joined], [...bytes], 'payload must survive the port round-trip');
+});
+
+test('empty files advertise zero chunks and finish without a phantom chunk', async () => {
+  const { FTM, sandbox } = load([...SHARED, 'content/config.js', 'content/transport.js'], { hostname: 'chatgpt.com' });
+  const sent = [];
+  const handlers = {};
+  sandbox.chrome.runtime.connect = () => ({
+    postMessage: (m) => sent.push(m), disconnect: () => {},
+    onMessage: { addListener: (fn) => { handlers.message = fn; } },
+    onDisconnect: { addListener: (fn) => { handlers.disconnect = fn; } }
+  });
+  const promise = FTM.transport.convert({ name: 'empty.pdf', size: 0, slice: () => { throw new Error('must not read'); } }, '.pdf');
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(sent[0].data.totalChunks, 0);
+  assert.equal(sent[1].type, FTM.MSG.END);
+  handlers.message({ type: FTM.MSG.ERROR, data: { error: 'File is empty' } });
+  await assert.rejects(() => promise, /File is empty/);
 });
 
 test('transport rejects oversized files before reading them', async () => {

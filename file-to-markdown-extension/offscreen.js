@@ -61,6 +61,7 @@
         this.buffer.set(decoded, this.offset);
         this.offset += decoded.length;
         this.received++;
+        this.send({ type: FTM.MSG.ACK, data: { index: data.index } });
       } catch (_) { this.fail('Invalid chunk encoding'); }
     }
 

@@ -82,6 +82,8 @@
 
   async function injectViaClipboard(target, files) {
     try {
+      if (typeof self.confirm !== 'function' || !self.confirm('FTM Studio could not attach the converted file. Copy the Markdown to your clipboard instead?')) return false;
+      if (!self.navigator.clipboard || typeof self.navigator.clipboard.writeText !== 'function') return false;
       const text = await files[0].text();
       await self.navigator.clipboard.writeText(text);
       FTM.showNotice('Converted markdown copied to clipboard — paste it into the chat.');
@@ -290,9 +292,9 @@
   }
 
   function onDrop(event) {
+    if (handledEvents.has(event)) return;
     const dt = event.dataTransfer;
     if (!dt || !eligible(dt.files)) return;
-    if (handledEvents.has(event)) return;
     handledEvents.add(event);
     event.preventDefault();
     event.stopPropagation();
@@ -300,10 +302,10 @@
   }
 
   function onChange(event) {
+    if (handledEvents.has(event)) return;
     const input = event.target;
     if (!input || input.tagName !== 'INPUT' || input.type !== 'file') return;
     if (!eligible(input.files)) return;
-    if (handledEvents.has(event)) return;
     handledEvents.add(event);
     event.preventDefault();
     event.stopPropagation();
