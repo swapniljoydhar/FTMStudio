@@ -83,11 +83,11 @@
       "purpose": "OCR Web Worker (lazy-loaded for scanned PDFs only)"
     },
     "tesseract/langs/eng.traineddata.gz": {
-      "version": "4.0.0_best_int",
-      "source": "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz",
-      "npm": "https://www.npmjs.com/package/@aspect-build/aspect-tesseract",
-      "sha256_hex": "45b4cb346724ac1774f1c36f42f182b887bcdb28ebe63e6fff90ac41f3fcff91",
-      "size": 2952873,
+      "version": "4.1.0",
+      "source": "https://github.com/tesseract-ocr/tessdata_fast/raw/master/eng.traineddata.gz",
+      "github": "https://github.com/tesseract-ocr/tessdata_fast",
+      "sha256_hex": "9ecda46d7817433062b698a7baaea325b5dee6def670d702dd61516d3b00889e",
+      "size": 326400,
       "purpose": "English language trained data for OCR (lazy-loaded for scanned PDFs only)"
     }
   }

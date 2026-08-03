@@ -24,7 +24,7 @@
 
   if (self.chrome && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((message, sender) => {
-      if (!FTM.messages.isTrustedPort({ sender })) return;
+      if (!FTM.messages?.isTrustedPort({ sender })) return;
       if (message && message.type === FTM.MSG.CONFIG_UPDATE && message.config) FTM.applyConfig(message.config);
     });
   }

@@ -5,13 +5,13 @@
   "license": "Apache-2.0",
   "description": "FTM Studio — privacy-first file-to-Markdown Chrome extension",
   "scripts": {
-    "test": "node --test test/config.test.js test/documents.test.js test/history.test.js test/pipeline.test.js test/postprocess.test.js test/sources.test.js test/text.test.js test/worker.test.js",
+    "test": "node --test test/config.test.js test/documents.test.js test/history.test.js test/pipeline.test.js test/postprocess.test.js test/sources.test.js test/text.test.js test/worker.test.js test/converters.test.js test/messages.test.js test/archives.test.js",
     "build": "node scripts/verify-extension.mjs",
     "lint": "eslint .",
     "verify:libs": "node scripts/verify-libs.mjs"
   },
   "devDependencies": {
-    "eslint": "9.17.0"
+    "eslint": "^10.8.0"
   },
   "engines": {
     "node": ">=20"

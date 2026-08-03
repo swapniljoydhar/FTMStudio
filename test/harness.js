@@ -96,6 +96,50 @@ function load(files, options = {}) {
   return { FTM: sandbox.FTM, sandbox, chrome, storage, run };
 }
 
+// Simple DOMParser mock for offscreen document testing
+class MockDOMParser {
+  parseFromString() {
+    // Very minimal implementation for testing purposes
+    return {
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      body: null,
+      documentElement: null
+    };
+  }
+}
+
+// Load function with DOMParser for offscreen documents that need it
+function loadWithDOMParser(files, options = {}) {
+  const storage = new StorageArea(options.storage || {});
+  const chrome = chromeStub(storage);
+  const sandbox = {
+    console,
+    performance,
+    setTimeout,
+    clearTimeout,
+    TextDecoder,
+    TextEncoder,
+    Blob,
+    btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+    atob: (s) => Buffer.from(s, 'base64').toString('binary'),
+    chrome,
+    location: { hostname: options.hostname || 'example.com' },
+    DOMParser: MockDOMParser  // Use mock DOMParser for testing
+  };
+  sandbox.self = sandbox;
+  sandbox.globalThis = sandbox;
+  const context = vm.createContext(sandbox);
+  const evaluate = (file) => {
+    const code = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    new vm.Script(code, { filename: file }).runInContext(context);
+  };
+  sandbox.importScripts = (...paths) => { for (const p of paths) evaluate(p); };
+  for (const file of files) evaluate(file);
+  const run = (code) => new vm.Script(code, { filename: 'inline' }).runInContext(context);
+  return { FTM: sandbox.FTM, sandbox, chrome, storage, run };
+}
+
 const SHARED = ['shared/constants.js', 'shared/text.js', 'shared/config.js'];
 
 function loadShared(options) {
@@ -106,4 +150,8 @@ function loadContent(options) {
   return load([...SHARED, 'content/config.js', 'content/activation.js', 'content/postprocess.js', 'content/history.js'], options);
 }
 
-module.exports = { load, loadShared, loadContent, SHARED, ROOT };
+function loadArchives(options) {
+  return loadWithDOMParser([...SHARED, 'offscreen/archives.js'], options);
+}
+
+module.exports = { load, loadShared, loadContent, loadArchives, loadWithDOMParser, SHARED, ROOT };
