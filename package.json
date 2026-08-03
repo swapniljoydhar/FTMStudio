@@ -2,6 +2,7 @@
   "name": "ftm-studio",
   "version": "3.0.0",
   "private": true,
+  "license": "Apache-2.0",
   "description": "FTM Studio — privacy-first file-to-Markdown Chrome extension",
   "scripts": {
     "test": "node --test test/config.test.js test/documents.test.js test/history.test.js test/pipeline.test.js test/postprocess.test.js test/sources.test.js test/text.test.js test/worker.test.js",

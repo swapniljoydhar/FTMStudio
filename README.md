@@ -316,4 +316,13 @@ FTMStudio/
 
 ---
 
+## License
+
+FTM Studio's original source code is licensed under the [Apache License 2.0](LICENSE).
+
+Bundled third-party libraries retain their respective licenses. See [NOTICE.md](NOTICE.md)
+for the dependency and attribution summary.
+
+---
+
 *Version 3.0.0 — 87 tests passing*
