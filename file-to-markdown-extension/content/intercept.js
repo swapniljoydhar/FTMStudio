@@ -17,6 +17,7 @@
   let current = null;
   let reDispatching = 0;
   const handledEvents = new WeakSet();
+  const TEXT_SNIFF_EXTS = new Set(['.md', '.txt', '.html']);
 
   class Session {
     constructor(files, target) {
@@ -284,9 +285,8 @@
     if (reDispatching > 0 || !FTM.config.enabled || !FTM.activation.shouldActivate()) return false;
     for (const file of files) {
       if (FTM.activation.shouldInterceptFile(file)) return true;
-      // Also check if a text-extension file has binary content.
       const ext = FTM.text.getExtension(file.name).toLowerCase();
-      if (['.md', '.txt', '.html'].includes(ext) && file.size > 100) return true;
+      if (TEXT_SNIFF_EXTS.has(ext) && file.size > 100) return true;
     }
     return false;
   }

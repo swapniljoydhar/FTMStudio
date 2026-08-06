@@ -339,6 +339,24 @@
     try { return new ErrorToast(fileName, message).open(); } catch (_) { return null; }
   };
 
-  // FIX Perf #9: Return the pre-computed cached string.
-  FTM.toastStyles = function toastStyles() { return CACHED_STYLES; };
+  FTM.showNotice = function showNotice(message) {
+    try {
+      const host = el('div');
+      host.style.cssText = 'position:fixed;top:16px;right:16px;z-index:2147483647;pointer-events:auto;opacity:0;transition:opacity .3s;';
+      const root = host.attachShadow({ mode: 'closed' });
+      root.appendChild(el('style')).textContent = CACHED_STYLES;
+      const wrapper = el('div', 'ftm-toast');
+      const hint = el('div', 'ftm-toast-hint', message);
+      hint.style.cssText = 'font-size:11px;color:#6b6b76;';
+      wrapper.append(hint);
+      root.appendChild(wrapper);
+      document.documentElement.appendChild(host);
+      void host.offsetHeight;
+      host.style.opacity = '1';
+      setTimeout(() => {
+        host.style.opacity = '0';
+        setTimeout(() => { if (host.parentNode) host.parentNode.removeChild(host); }, 400);
+      }, 4000);
+    } catch (_) {}
+  };
 })();

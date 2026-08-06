@@ -115,5 +115,4 @@
       return new Transfer(file, extension, options).run();
     }
   };
-  FTM.Transfer = Transfer;
 })();
