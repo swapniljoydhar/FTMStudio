@@ -43,7 +43,7 @@ async function seedConfig(reason) {
   try {
     await chrome.storage.local.set(configCache);
   } catch (err) {
-    console.error('[FTM Studio] Config initialization failed:', err);
+    console.error('[FTM Studio] Config initialization failed:', err?.name || 'UnknownError');
     throw err;
   }
 }

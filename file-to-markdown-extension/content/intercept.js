@@ -324,7 +324,7 @@
       await FTM.loadConfig();
     } catch (err) {
       // Config load failed — show visible error instead of silent disable.
-      console.warn('[FTM Studio] Config load failed, using defaults:', err);
+      console.warn('[FTM Studio] Config load failed, using defaults:', err?.name || 'UnknownError');
       try {
         FTM.config = FTM.configUtils.defaults({});
         FTM.showError('FTM Studio', 'Settings corrupted — using defaults. Open popup to reset.');
