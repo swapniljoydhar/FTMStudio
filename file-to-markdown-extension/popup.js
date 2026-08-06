@@ -182,9 +182,29 @@
       const node = $(id);
       if (!node) continue;
       node.addEventListener('change', () => {
+        if (key === 'smartMode' && !node.checked) {
+          // Classic Mode requires <all_urls> — request dynamically.
+          requestAllUrlsPermission().then((granted) => {
+            if (!granted) {
+              node.checked = true; // Revert toggle if denied.
+              setSaveStatus('Permission denied — Classic Mode requires access to all sites', true);
+              return;
+            }
+            save({ [key]: false });
+          });
+          return;
+        }
         save({ [key]: node.checked });
         if (key === 'enabled') renderStatus();
       });
+    }
+  }
+
+  async function requestAllUrlsPermission() {
+    try {
+      return await chrome.permissions.request({ origins: ['<all_urls>'] });
+    } catch (_) {
+      return false;
     }
   }
 

@@ -30,8 +30,18 @@
       return patterns;
     },
 
-    matches(config) {
-      if (!config.smartMode) return ['<all_urls>'];
+    async hasAllUrlsPermission() {
+      try { return await chrome.permissions.contains({ origins: ['<all_urls>'] }); } catch (_) { return false; }
+    },
+
+    async matches(config) {
+      if (!config.smartMode) {
+        // Classic Mode requires <all_urls> permission (granted dynamically).
+        const hasPermission = await this.hasAllUrlsPermission();
+        if (hasPermission) return ['<all_urls>'];
+        // Fall back to Smart Mode if permission not granted.
+        console.warn('[FTM Studio] Classic Mode requires host permission — falling back to Smart Mode');
+      }
       return this.patternsFor(FTM.configUtils.effectiveHosts(config));
     },
 
@@ -60,7 +70,7 @@
       const cfg = config || FTM.configUtils.defaults(await chrome.storage.local.get(null));
       await this.unregister();
       if (cfg.enabled === false) return { registered: false, patterns: 0 };
-      const matches = this.matches(cfg);
+      const matches = await this.matches(cfg);
       if (matches.length === 0) return { registered: false, patterns: 0 };
       return this.register(matches, this.excludes(cfg));
     },

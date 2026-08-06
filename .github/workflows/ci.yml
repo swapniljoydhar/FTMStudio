@@ -3,6 +3,9 @@ name: Validate extension
 on:
   push:
   pull_request:
+  schedule:
+    # Verify pinned libraries weekly on Wednesday at 06:00 UTC
+    - cron: '0 6 * * 3'
 
 permissions:
   contents: read

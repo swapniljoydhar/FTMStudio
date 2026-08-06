@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { load, loadShared, SHARED } = require('./harness');
+const SHARED_WITH_MSG = [...SHARED, 'shared/messages.js'];
 
 test('table writer emits a header, a separator and equal-width rows', () => {
   const { FTM } = load([...SHARED, 'offscreen/tabular.js']);
@@ -36,17 +37,18 @@ test('table writer reports truncation instead of throwing', () => {
 });
 
 test('binary transport frames a file as BEGIN / CHUNK* / END', async () => {
-  const { FTM, sandbox } = load([...SHARED, 'content/config.js', 'content/transport.js'], { hostname: 'chatgpt.com' });
+  const { FTM, sandbox } = load([...SHARED_WITH_MSG, 'content/config.js', 'content/transport.js'], { hostname: 'chatgpt.com' });
   const sent = [];
-  const handlers = {};
-  sandbox.chrome.runtime.connect = () => ({
+  // Shared listeners array so both connect() calls (content + offscreen) see the same handlers.
+  const listeners = [];
+  const makePort = () => ({
     postMessage: (m) => sent.push(m),
     disconnect: () => {},
-    onMessage: { addListener: (fn) => { handlers.message = fn; } },
-    onDisconnect: { addListener: (fn) => { handlers.disconnect = fn; } }
+    onMessage: { addListener: (fn) => { listeners.push(fn); } },
+    onDisconnect: { addListener: () => {} }
   });
+  sandbox.chrome.runtime.connect = makePort;
   const bytes = new Uint8Array(1500000).map((_, i) => i % 251);
-  // Mock file with slice() support for streaming transport.
   const file = {
     name: 'a.docx',
     size: bytes.length,
@@ -56,6 +58,12 @@ test('binary transport frames a file as BEGIN / CHUNK* / END', async () => {
     }
   };
   const promise = FTM.transport.convert(file, '.docx');
+
+  // Wait for BEGIN to be sent so we can extract sessionId.
+  await new Promise((r) => setTimeout(r, 0));
+  const sid = sent[0] && sent[0].data && sent[0].data.sessionId;
+  assert.ok(sid, 'BEGIN must include sessionId');
+
   let acknowledged = 0;
   await new Promise((resolve) => {
     const pump = () => {
@@ -63,14 +71,14 @@ test('binary transport frames a file as BEGIN / CHUNK* / END', async () => {
       if (chunks.length > acknowledged) {
         const chunk = chunks[chunks.length - 1];
         acknowledged = chunks.length;
-        handlers.message({ type: FTM.MSG.ACK, data: { index: chunk.data.index } });
+        for (const fn of listeners) fn({ type: FTM.MSG.ACK, data: { sessionId: sid, index: chunk.data.index } });
       }
       if (sent[sent.length - 1] && sent[sent.length - 1].type === FTM.MSG.END) resolve();
       else setTimeout(pump, 0);
     };
     pump();
   });
-  handlers.message({ type: FTM.MSG.RESULT, data: { markdown: '# ok' } });
+  for (const fn of listeners) fn({ type: FTM.MSG.RESULT, data: { sessionId: sid, markdown: '# ok' } });
   assert.equal(await promise, '# ok');
 
   assert.equal(sent[0].type, FTM.MSG.BEGIN);
@@ -83,36 +91,42 @@ test('binary transport frames a file as BEGIN / CHUNK* / END', async () => {
 });
 
 test('empty files advertise zero chunks and finish without a phantom chunk', async () => {
-  const { FTM, sandbox } = load([...SHARED, 'content/config.js', 'content/transport.js'], { hostname: 'chatgpt.com' });
+  const { FTM, sandbox } = load([...SHARED_WITH_MSG, 'content/config.js', 'content/transport.js'], { hostname: 'chatgpt.com' });
   const sent = [];
-  const handlers = {};
-  sandbox.chrome.runtime.connect = () => ({
+  const listeners = [];
+  const makePort = () => ({
     postMessage: (m) => sent.push(m), disconnect: () => {},
-    onMessage: { addListener: (fn) => { handlers.message = fn; } },
-    onDisconnect: { addListener: (fn) => { handlers.disconnect = fn; } }
+    onMessage: { addListener: (fn) => { listeners.push(fn); } },
+    onDisconnect: { addListener: () => {} }
   });
+  sandbox.chrome.runtime.connect = makePort;
   const promise = FTM.transport.convert({ name: 'empty.pdf', size: 0, slice: () => { throw new Error('must not read'); } }, '.pdf');
   await new Promise((r) => setTimeout(r, 0));
+  const sid = sent[0] && sent[0].data && sent[0].data.sessionId;
+  assert.ok(sid, 'BEGIN must include sessionId');
   assert.equal(sent[0].data.totalChunks, 0);
   assert.equal(sent[1].type, FTM.MSG.END);
-  handlers.message({ type: FTM.MSG.ERROR, data: { error: 'File is empty' } });
+  // Simulate offscreen responding with empty-file error.
+  for (const fn of listeners) fn({ type: FTM.MSG.ERROR, data: { sessionId: sid, error: 'File is empty' } });
   await assert.rejects(() => promise, /File is empty/);
 });
 
 test('transport rejects oversized files before reading them', async () => {
-  const { FTM } = load([...SHARED, 'content/config.js', 'content/transport.js'], { hostname: 'chatgpt.com' });
+  const { FTM } = load([...SHARED_WITH_MSG, 'content/config.js', 'content/transport.js'], { hostname: 'chatgpt.com' });
   const file = { name: 'huge.pdf', size: FTM.CONSTANTS.MAX_FILE_SIZE_BYTES + 1, slice: () => ({ arrayBuffer: async () => { throw new Error('must not read'); } }) };
   await assert.rejects(() => FTM.transport.convert(file, '.pdf'), /too large/i);
 });
 
 test('transport surfaces offscreen errors', async () => {
-  const { FTM, sandbox } = load([...SHARED, 'content/config.js', 'content/transport.js'], { hostname: 'chatgpt.com' });
-  const handlers = {};
-  sandbox.chrome.runtime.connect = () => ({
-    postMessage: () => {}, disconnect: () => {},
-    onMessage: { addListener: (fn) => { handlers.message = fn; } },
-    onDisconnect: { addListener: (fn) => { handlers.disconnect = fn; } }
+  const { FTM, sandbox } = load([...SHARED_WITH_MSG, 'content/config.js', 'content/transport.js'], { hostname: 'chatgpt.com' });
+  const sent = [];
+  const listeners = [];
+  const makePort = () => ({
+    postMessage: (m) => sent.push(m), disconnect: () => {},
+    onMessage: { addListener: (fn) => { listeners.push(fn); } },
+    onDisconnect: { addListener: () => {} }
   });
+  sandbox.chrome.runtime.connect = makePort;
   const data = new Uint8Array([1, 2, 3, 4]);
   const file = {
     name: 'a.pdf', size: 4,
@@ -120,7 +134,9 @@ test('transport surfaces offscreen errors', async () => {
   };
   const promise = FTM.transport.convert(file, '.pdf');
   await new Promise((r) => setTimeout(r, 50));
-  handlers.message({ type: FTM.MSG.ERROR, data: { error: 'encrypted PDF' } });
+  const sid = sent[0] && sent[0].data && sent[0].data.sessionId;
+  assert.ok(sid, 'BEGIN must include sessionId');
+  for (const fn of listeners) fn({ type: FTM.MSG.ERROR, data: { sessionId: sid, error: 'encrypted PDF' } });
   await assert.rejects(() => promise, /encrypted PDF/);
 });
 

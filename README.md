@@ -112,7 +112,11 @@ repository history as appropriate.
 
 ### Permissions
 
-The extension uses `storage`, `offscreen`, `scripting`, and `downloads`. It declares `<all_urls>` because Classic Mode intentionally supports arbitrary websites; Smart Mode dynamically registers and activates only on configured AI hosts. All conversion remains local.
+The extension uses `storage`, `offscreen`, `scripting`, and `downloads`.
+
+**Host permissions are opt-in:** by default, FTM Studio only runs on 220+ built-in AI sites (Smart Mode). If you enable Classic Mode (intercept on all websites), the extension will request `<all_urls>` permission via a browser consent dialog. You can revoke this at any time in Chrome's extension settings.
+
+All conversion remains 100% local — no data leaves your browser regardless of mode.
 
 ---
 
@@ -255,6 +259,22 @@ Click the extension icon to open the settings dashboard with collapsible section
 | Silent Failures | Original file re-dispatched on any conversion error |
 | History PII Leak | Filenames stored as `*.ext` only; 30-day auto-expiry |
 | Screen Reader Inaccessibility | `mode: 'open'` shadow, `role="alert"`, `aria-live`, auto-focus |
+
+### Supply Chain Security
+
+All third-party libraries are **vendored locally** under `file-to-markdown-extension/lib/` and pinned in [`lib/lockfile.json`](file-to-markdown-extension/lib/lockfile.json) with SHA-256 hashes. CI runs `npm run verify:libs` on every push and on a weekly schedule to detect tampering.
+
+**CI hardening:**
+- [CodeQL](https://github.com/github/codeql) static analysis runs on push, PR, and weekly
+- [Dependabot](https://github.com/dependabot) monitors npm dependencies and GitHub Actions
+- `verify:libs` compares vendored files against known SHA-256 hashes
+
+**When updating vendored libraries:**
+1. Download from the official upstream release
+2. Update `lib/lockfile.json` with the new version, URL, size, and SHA-256
+3. Run `npm run verify:libs` and `npm test`
+
+Upstream repos: [PDF.js](https://github.com/mozilla/pdf.js) · [Tesseract.js](https://github.com/naptha/tesseract.js) · [JSZip](https://github.com/Stuk/jszip) · [SheetJS](https://github.com/SheetJS/sheetjs) · [PapaParse](https://github.com/mholt/PapaParse) · [Turndown](https://github.com/mixmark-io/turndown) · [Mammoth.js](https://github.com/mwilliamson/mammoth.js)
 
 ---
 

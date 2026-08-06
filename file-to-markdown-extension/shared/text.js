@@ -360,6 +360,14 @@
       return out;
     },
 
+    // Decode a base64 string and write bytes into `buffer` starting at `offset`.
+    // Returns the new offset after the written bytes.
+    fromBase64Into(str, buffer, offset) {
+      const bin = atob(str);
+      for (let j = 0; j < bin.length; j++) buffer[offset + j] = bin.charCodeAt(j);
+      return offset + bin.length;
+    },
+
     encodeChunks(bytes, chunkSize) {
       const size = chunkSize || FTM.CONSTANTS.TRANSFER_CHUNK_BYTES;
       const chunks = [];
