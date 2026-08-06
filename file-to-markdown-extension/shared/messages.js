@@ -4,6 +4,7 @@
   const FTM = (self.FTM = self.FTM || {});
   const isObject = (value) => value !== null && typeof value === 'object';
   const validExtension = (value) => typeof value === 'string' && FTM.EXTENSION_MAP[value] !== undefined;
+  const validImageMode = (value) => value === 'embedded' || value === 'placeholder' || value === 'external';
   const validType = (message, type) => isObject(message) && message.type === type;
   const validBegin = (message) => {
     const data = message && message.data;
@@ -11,7 +12,8 @@
       && data.fileName.length > 0 && data.fileName.length <= 255 && validExtension(data.extension)
       && Number.isInteger(data.size) && data.size >= 0 && data.size <= FTM.CONSTANTS.MAX_FILE_SIZE_BYTES
       && Number.isInteger(data.totalChunks) && data.totalChunks >= 0
-      && data.totalChunks <= Math.ceil(FTM.CONSTANTS.MAX_FILE_SIZE_BYTES / FTM.CONSTANTS.TRANSFER_CHUNK_BYTES);
+      && data.totalChunks <= Math.ceil(FTM.CONSTANTS.MAX_FILE_SIZE_BYTES / FTM.CONSTANTS.TRANSFER_CHUNK_BYTES)
+      && (!data.imageMode || validImageMode(data.imageMode));
   };
   const validChunk = (message) => {
     const data = message && message.data;

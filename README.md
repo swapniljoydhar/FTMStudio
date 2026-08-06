@@ -3,7 +3,7 @@
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue)](https://developer.chrome.com/docs/extensions/mv3/intro/)
 [![Privacy First](https://img.shields.io/badge/Privacy-100%25%20Local-green)]()
 [![Version](https://img.shields.io/badge/version-3.0.0-orange)]()
-[![Tests](https://img.shields.io/badge/tests-138%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-139%20passing-brightgreen)]()
 
 A **privacy-first**, **100% local** Chrome extension that intercepts file uploads on AI/chatbot websites and converts documents to structured Markdown **before data leaves your browser**. All processing happens client-side — no servers, no cloud, no tracking.
 
@@ -62,7 +62,7 @@ The extension only activates on **AI and chatbot sites** by default — no annoy
 - **Cover Artifact Stripping** — license notices, boilerplate, empty headings removed
 - **HTML Entity Decode** — handles double-encoded entities (`&amp;amp;` → `&`)
 - **YAML Frontmatter** — includes `token_estimate`, `content_hash`, `word_count`, `recommended_chunk_level`
-- **Image Mode** — choose `embedded` (default), `placeholder`, or `external`
+- **Image Mode** — choose `embedded` (default), `placeholder`, or `external`; local DOCX images use a placeholder for the latter two modes because no external image URL exists
 - **PDF Header/Footer Dedup** — repeated lines across pages removed
 - **Password-Protected PDFs** — clear error message instead of silent failure
 
@@ -126,7 +126,7 @@ FTM Studio sits quietly in your browser and watches for file uploads. When you d
 
 ### Three-Layer Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │  Layer 1: Content Script (registered when enabled)  │
 │  shared/{constants,text,config}.js                  │
@@ -158,7 +158,7 @@ FTM Studio sits quietly in your browser and watches for file uploads. When you d
 
 Files stream via `file.slice()` — only one 512KB chunk in memory at a time:
 
-```
+```text
 Sender (content script):          Receiver (offscreen):
   file.slice(0, 512KB)              chunk 1 → decode → bounded write
   → base64 → send → release         chunk 2 → decode → bounded write
@@ -183,7 +183,7 @@ Click the extension icon to open the settings dashboard with collapsible section
 | **Auto-Convert** | Convert files without showing the toast prompt |
 | **YAML Frontmatter** | Inject metadata header (with token estimate, content hash) |
 | **Preserve Original MIME** | Use source file's MIME type on converted `.md` |
-| **Image Mode** | `embedded` (default), `placeholder`, or `external` |
+| **Image Mode** | `embedded` (default), `placeholder`, or `external`; local DOCX images use a placeholder for the latter two modes |
 | **File Formats** | Enable/disable specific file categories (collapsible) |
 
 ### Sites Tab
@@ -250,19 +250,20 @@ Click the extension icon to open the settings dashboard with collapsible section
 
 ```bash
 npm install
-npm test          # node — 138 tests against the real sources
+npm test          # node — 139 tests against the real sources
 npm run lint      # eslint
 npm run verify:libs   # SHA-256 verification of the pinned parser libraries
 ```
 
 GitHub Actions runs these same checks on every push and pull request. The
-`file-to-markdown-extension/lib/lockfile.json` file is authoritative for
-vendor versions, URLs, sizes, and SHA-256 hashes; run `npm run verify:libs`
-after any intentional library update.
+The [library lockfile](file-to-markdown-extension/lib/lockfile.json) is authoritative for
+vendor versions, URLs, sizes, and SHA-256 hashes; it includes the English Tesseract
+data required by scanned-PDF OCR. Run `npm run verify:libs` after any intentional
+library update.
 
 ### Project Structure
 
-```
+```text
 FTMStudio/
 ├── file-to-markdown-extension/
 │   ├── manifest.json
@@ -294,7 +295,7 @@ FTMStudio/
 │   ├── popup.html / .js / .css    # Settings dashboard + splash + accordions
 │   ├── lib/                       # Pinned parser libraries
 │   └── icons/                     # Extension icons
-├── test/                          # 138 node:test cases
+├── test/                          # 139 node:test cases
 ├── package.json
 ├── README.md
 ├── LICENSE
@@ -327,4 +328,4 @@ for the dependency and attribution summary.
 
 ---
 
-*Version 3.0.0 — 138 tests passing*
+*Version 3.0.0 — 139 tests passing*

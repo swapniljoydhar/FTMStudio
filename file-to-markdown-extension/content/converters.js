@@ -72,7 +72,10 @@
     },
 
     offscreen(file, ext) {
-      const options = ext === '.csv' ? { streaming: this.csvStreams(file) } : {};
+      const options = {
+        imageMode: FTM.config.imageMode,
+        ...(ext === '.csv' ? { streaming: this.csvStreams(file) } : {})
+      };
       return FTM.transport.convert(file, ext, options);
     }
   };

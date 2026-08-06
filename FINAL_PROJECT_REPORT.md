@@ -34,7 +34,7 @@ The extension solves a UX problem: when uploading files to AI chatbots (ChatGPT,
 
 Files stream via `file.slice()` — transport keeps only one 512KB chunk in flight:
 
-```
+```text
 Sender (content):  file.slice(0, 512KB) → base64 → send → GC
 Receiver (offscreen):  chunk → fromBase64 → bounded offset write
 ```
@@ -70,7 +70,7 @@ The receiver uses a single bounded buffer where a parser requires random access;
 - **TOC removal** — dot-leader patterns stripped
 - **Cover artifact stripping** — license notices, boilerplate removed
 - **YAML frontmatter** — `token_estimate`, `content_hash`, `word_count`, `recommended_chunk_level`
-- **Image mode** — `embedded`, `placeholder`, or `external`
+- **Image mode** — `embedded`, `placeholder`, or `external`; local DOCX images use a placeholder for the latter two modes because no external image URL exists
 
 ### Security
 - **ReDoS protection** — progressive scaling probe (3 sizes, 15ms budget)
