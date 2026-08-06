@@ -24,7 +24,7 @@
 
   function docxImageConverter(images, imageMode, mammoth) {
     return mammoth.images.imgElement((img) => {
-      if (imageMode === 'placeholder') return { src: '', alt: '[Image]' };
+      if (imageMode === 'placeholder' || imageMode === 'external') return { src: '', alt: '[Image]' };
       return img.read('base64').then((b64) => {
         if (b64.length * 0.75 > MAX_EMBED_IMAGE_BYTES) return { src: '', alt: '[Image — too large to embed]' };
         const src = 'data:' + (img.contentType || 'image/png') + ';base64,' + b64;
@@ -43,7 +43,7 @@
 
   async function parseDocx(bytes, meta) {
     const mammoth = await FTM.libs.get('mammoth');
-    const imageMode = (FTM.config && FTM.config.imageMode) || 'embedded';
+    const imageMode = meta.imageMode || 'embedded';
     const images = [];
     const result = await mammoth.convertToHtml({ arrayBuffer: bytes.buffer }, {
       convertImage: docxImageConverter(images, imageMode, mammoth)

@@ -135,6 +135,38 @@ test('parseDocx is registered as a parser', () => {
   assert.equal(typeof FTM.parsers['.docx'], 'function');
 });
 
+test('parseDocx honours per-conversion image mode', async () => {
+  const { FTM } = loadDocs();
+  let convertedImage;
+  FTM.libs = {
+    get: async () => ({
+      images: {
+        imgElement: (handler) => handler
+      },
+      convertToHtml: async (_input, options) => {
+        convertedImage = await options.convertImage({
+          contentType: 'image/png',
+          read: async () => 'encoded-image'
+        });
+        return { value: '<img src="' + convertedImage.src + '">' };
+      }
+    }),
+    turndown: async () => ({ turndown: (html) => html })
+  };
+
+  const parse = FTM.parsers['.docx'];
+  const embedded = await parse(new Uint8Array([1]), { fileName: 'file.docx', imageMode: 'embedded' });
+  assert.match(embedded, /data:image\/png;base64,encoded-image/);
+
+  const placeholder = await parse(new Uint8Array([1]), { fileName: 'file.docx', imageMode: 'placeholder' });
+  assert.equal(convertedImage.src, '');
+  assert.doesNotMatch(placeholder, /encoded-image/);
+
+  const external = await parse(new Uint8Array([1]), { fileName: 'file.docx', imageMode: 'external' });
+  assert.equal(convertedImage.src, '');
+  assert.doesNotMatch(external, /encoded-image/);
+});
+
 test('parseSpreadsheet is registered for xlsx and xls', () => {
   const { FTM } = loadDocs();
   assert.equal(typeof FTM.parsers['.xlsx'], 'function');

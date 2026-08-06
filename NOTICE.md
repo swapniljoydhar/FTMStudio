@@ -15,7 +15,7 @@ licenses; this notice does not replace or alter them.
 | PDF.js | 4.10.38 | Apache-2.0 | [PDF.js](https://github.com/mozilla/pdf.js) |
 | Papa Parse | 5.4.1 | MIT | [Papa Parse](https://github.com/mholt/PapaParse) |
 | Tesseract.js | 5.1.1 | Apache-2.0 | [Tesseract.js](https://github.com/naptha/tesseract.js) |
-| Tesseract English trained data | 4.0.0_best_int | Apache-2.0 | [tesseract.js-data](https://github.com/naptha/tessdata) |
+| Tesseract English trained data | 4.0.0_fast | Apache-2.0 | [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast) |
 
 The exact bundled files, source URLs, sizes, versions, and SHA-256 hashes are
 tracked in [`lib/lockfile.json`](file-to-markdown-extension/lib/lockfile.json)
