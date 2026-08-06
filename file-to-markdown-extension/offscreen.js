@@ -1,113 +1,55 @@
-// ===========================================================================
-// offscreen.js — Transport endpoint for the offscreen parser document
-// ===========================================================================
-// Accepts one session per connected port, reassembles the chunked payload
-// incrementally (decode each base64 chunk as it arrives, write into a bounded
-// Uint8Array), and dispatches to the parser registry.
-//
-// Memory profile:
-//   OLD: collect all base64 strings → decode all at once.
-//        Peak ≈ file.size × 2.67  (base64 strings + decoded bytes).
-//   NEW: decode each chunk on arrival → bounded offset write → reclaim strings.
-//        Peak is bounded by the declared decoded buffer plus parser overhead.
-// ===========================================================================
-
+// Explicit session state machine for the internal parser Port.
 'use strict';
-
 (() => {
   const FTM = self.FTM;
-  const sessions = new Set();
-  let activeParses = 0;
-
+  const sessions = new Set(); let activeParses = 0;
   class Session {
-    constructor(port) {
-      this.port = port;
-      this.reset();
-    }
-
-    reset() {
-      this.meta = null;
-      this.buffer = null;   // Uint8Array — preallocated at BEGIN
-      this.received = 0;    // chunks received so far
-      this.offset = 0;
-    }
-
+    constructor(port) { this.port = port; this.state = 'awaiting-begin'; this.meta = null; this.buffer = null; this.received = 0; this.offset = 0; this.cancelled = false; }
     handle(message) {
-      if (FTM.messages && !FTM.messages.fromContent(message)) { this.fail('Invalid conversion message'); return; }
-      if (message.type === FTM.MSG.BEGIN) this.begin(message.data || {});
-      else if (message.type === FTM.MSG.CHUNK) this.chunk(message.data || {});
-      else if (message.type === FTM.MSG.ERROR) this.fail(message.data.error);
-      else if (message.type === FTM.MSG.END) this.end();
+      if (!FTM.messages || !FTM.messages.fromContent(message)) return this.fail('Invalid conversion message');
+      if (this.state === 'terminal') return;
+      if (message.type === FTM.MSG.BEGIN) return this.begin(message.data);
+      if (!this.meta || message.data.sessionId !== this.meta.sessionId) return this.fail('Mismatched conversion session');
+      if (message.type === FTM.MSG.CANCEL || message.type === FTM.MSG.ERROR) return this.cancel();
+      if (message.type === FTM.MSG.CHUNK) return this.chunk(message.data);
+      if (message.type === FTM.MSG.END) return this.end();
+      this.fail('Unexpected conversion message');
     }
-
     begin(data) {
-      if (!data.fileName || !data.extension || !Number.isInteger(data.totalChunks)) {
-        this.fail('Invalid request: missing required fields');
-        return;
-      }
-      this.reset();
-      this.meta = data;
-      this.buffer = new Uint8Array(data.size);
+      if (this.state !== 'awaiting-begin') return this.fail('Duplicate conversion begin');
+      this.meta = data; this.buffer = new Uint8Array(data.size); this.state = 'receiving';
+      this.progress('transfer-accepted', 0);
     }
-
     chunk(data) {
-      if (!this.meta || typeof data.base64 !== 'string') { this.fail('Unexpected chunk'); return; }
-      if (data.index !== this.received + 1 || this.received >= this.meta.totalChunks) {
-        this.fail('Invalid chunk sequence'); return;
-      }
+      if (this.state !== 'receiving' || data.index !== this.received + 1 || this.received >= this.meta.totalChunks) return this.fail('Invalid chunk sequence');
       try {
-        const decoded = FTM.text.fromBase64(data.base64);
-        if (this.offset + decoded.length > this.buffer.length) { this.fail('Transfer exceeds declared size'); return; }
-        this.buffer.set(decoded, this.offset);
-        this.offset += decoded.length;
-        this.received++;
-        this.send({ type: FTM.MSG.ACK, data: { index: data.index } });
+        const next = FTM.text.fromBase64Into(data.base64, this.buffer, this.offset);
+        if (next > this.buffer.length) return this.fail('Transfer exceeds declared size');
+        this.offset = next; this.received++;
+        this.send(FTM.MSG.ACK, { index: data.index });
       } catch (_) { this.fail('Invalid chunk encoding'); }
     }
-
     end() {
-      if (!this.meta || this.received !== this.meta.totalChunks || this.offset !== this.meta.size) {
-        this.fail('Incomplete transfer'); return;
-      }
-      const meta = this.meta;
-      const bytes = this.buffer;
-      this.reset();
-      activeParses++;
-      FTM.parse(meta, bytes)
-        .then((markdown) => this.send({ type: FTM.MSG.RESULT, data: { markdown, fileName: meta.fileName } }))
-        .catch((err) => this.fail(err && err.message ? err.message : String(err)))
-        .finally(() => {
-          activeParses--;
-          if (sessions.size === 0 && activeParses === 0) FTM.libs.release();
-        });
+      if (this.state !== 'receiving' || this.received !== this.meta.totalChunks || this.offset !== this.meta.size) return this.fail('Incomplete transfer');
+      const meta = this.meta; const bytes = this.buffer;
+      this.buffer = null; this.state = 'parsing'; activeParses++;
+      this.progress('transfer-complete', 100);
+      FTM.parse(meta, bytes, (phase, percent) => this.progress(phase, percent)).then((markdown) => {
+        if (!this.cancelled && this.state === 'parsing') { this.progress('complete', 100); this.send(FTM.MSG.RESULT, { markdown }); this.terminal(); }
+      }).catch((err) => { if (!this.cancelled) this.fail((err && err.message) || 'Parser failed'); }).finally(() => { activeParses--; if (sessions.size === 0 && activeParses === 0) FTM.libs.release(); });
     }
-
-    send(message) {
-      try { this.port.postMessage(message); } catch (_) { /* port closed */ }
-    }
-
-    fail(error) {
-      this.send({ type: FTM.MSG.ERROR, data: { error } });
-    }
+    progress(phase, percent) { if (!this.cancelled && this.state !== 'terminal') this.send(FTM.MSG.PROGRESS, { phase, percent: Math.max(0, Math.min(100, Math.round(percent || 0))) }); }
+    cancel() { if (this.state === 'terminal') return; this.cancelled = true; this.buffer = null; this.send(FTM.MSG.ERROR, { error: 'Conversion cancelled' }); this.terminal(); }
+    fail(error) { if (this.state === 'terminal') return; this.buffer = null; this.send(FTM.MSG.ERROR, { error: String(error).slice(0, 1024) }); this.terminal(); }
+    terminal() { this.state = 'terminal'; }
+    send(type, data) { try { this.port.postMessage({ type, data: { sessionId: this.meta && this.meta.sessionId, ...data } }); } catch (_) {} }
   }
-
-  FTM.parse = async function parse(meta, bytes) {
-    const parser = FTM.parsers[meta.extension];
-    if (!parser) throw new Error('Unsupported binary format: ' + meta.extension);
-    if (!bytes.length) throw new Error('File is empty: ' + meta.fileName);
-    return parser(bytes, meta);
-  };
-
+  FTM.parse = async function(meta, bytes, progress) { const parser = FTM.parsers[meta.extension]; if (!parser) throw new Error('Unsupported binary format: ' + meta.extension); if (!bytes.length) throw new Error('File is empty'); progress('parser-running', 50); return parser(bytes, meta, progress); };
   chrome.runtime.onConnect.addListener((port) => {
-    if (port.name !== FTM.PORT.OFFSCREEN || (FTM.messages && !FTM.messages.isTrustedPort(port))) return;
-    const session = new Session(port);
-    sessions.add(session);
+    if (port.name !== FTM.PORT.OFFSCREEN || !FTM.messages || !FTM.messages.isTrustedPort(port)) return;
+    const session = new Session(port); sessions.add(session);
     port.onMessage.addListener((message) => session.handle(message));
-    port.onDisconnect.addListener(() => {
-      sessions.delete(session);
-      if (sessions.size === 0 && activeParses === 0) FTM.libs.release();
-    });
+    port.onDisconnect.addListener(() => { session.cancelled = true; session.buffer = null; sessions.delete(session); if (sessions.size === 0 && activeParses === 0) FTM.libs.release(); });
   });
-
   FTM.Session = Session;
 })();
