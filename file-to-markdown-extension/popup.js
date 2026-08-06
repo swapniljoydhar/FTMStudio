@@ -356,7 +356,7 @@
       const removeBtn = pill.querySelector('.site-pill-remove');
       if (removeBtn) removeBtn.title = idx >= 0 ? 'Remove' : 'Restore';
     }
-    renderSiteStats(overrides().filter((e) => String(e)[0] === '+').length);
+    renderSiteStats(overrides().filter((e) => String(e)[0] === '+').length, removedHosts());
   }
 
   function isValidDomain(domain) {

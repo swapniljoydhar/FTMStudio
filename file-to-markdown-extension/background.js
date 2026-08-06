@@ -94,18 +94,6 @@ function queueBroadcast(updated) {
   }, 0);
 }
 
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local') return;
-  const updated = relevantChanges(changes);
-  if (Object.keys(updated).length === 0) return;
-  queueBroadcast(updated);
-  if (REGISTRATION_KEYS.some((key) => key in updated)) {
-    configCache = FTM.configUtils.defaults(FTM.configUtils.merge(configCache || {}, updated));
-    serializedSync(configCache);
-  }
-});
-
-// ── Toolbar badge: green dot when ON, gray when OFF ────────────────
 function updateBadge(enabled) {
   try {
     chrome.action.setBadgeText({ text: enabled ? '' : 'OFF' });
@@ -114,10 +102,16 @@ function updateBadge(enabled) {
   } catch (_) { /* action API may not be available */ }
 }
 
-// Update badge on startup and config changes.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || !('enabled' in changes)) return;
-  updateBadge(changes.enabled.newValue !== false);
+  if (area !== 'local') return;
+  if ('enabled' in changes) updateBadge(changes.enabled.newValue !== false);
+  const updated = relevantChanges(changes);
+  if (Object.keys(updated).length === 0) return;
+  queueBroadcast(updated);
+  if (REGISTRATION_KEYS.some((key) => key in updated)) {
+    configCache = FTM.configUtils.defaults(FTM.configUtils.merge(configCache || {}, updated));
+    serializedSync(configCache);
+  }
 });
 
 // Set initial badge on install/startup.

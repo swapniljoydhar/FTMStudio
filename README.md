@@ -289,7 +289,7 @@ npm run lint      # eslint
 npm run verify:libs   # SHA-256 verification of the pinned parser libraries
 ```
 
-GitHub Actions runs these same checks on every push and pull request. The
+GitHub Actions runs these same checks on every push and pull request.
 The [library lockfile](file-to-markdown-extension/lib/lockfile.json) is authoritative for
 vendor versions, URLs, sizes, and SHA-256 hashes; it includes the English Tesseract
 data required by scanned-PDF OCR. Run `npm run verify:libs` after any intentional

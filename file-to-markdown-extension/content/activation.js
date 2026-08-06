@@ -15,10 +15,12 @@
   FTM.activation = {
     verdict: null,
     hosts: null,
+    _removed: null,
 
     invalidate() {
       this.verdict = null;
       this.hosts = null;
+      this._removed = null;
     },
 
     hostname() {
@@ -55,14 +57,18 @@
     },
 
     removedHosts() {
-      return (FTM.config.customAiHosts || [])
-        .filter((entry) => String(entry)[0] === '-')
-        .map((entry) => String(entry).substring(1));
+      if (!this._removed) {
+        this._removed = new Set(
+          (FTM.config.customAiHosts || [])
+            .filter((entry) => String(entry)[0] === '-')
+            .map((entry) => String(entry).substring(1))
+        );
+      }
+      return this._removed;
     },
 
     isSmartMatch() {
-      // FIX: Pass the Set directly — no spread, no array allocation.
-      if (this.matchesAny(new Set(this.removedHosts()))) return false;
+      if (this.matchesAny(this.removedHosts())) return false;
       return this.matchesAny(this.effectiveHosts());
     },
 

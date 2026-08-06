@@ -140,3 +140,42 @@ test('rtfToMarkdown collapses whitespace', () => {
   const md = T.rtfToMarkdown('{\\rtf1   hello    world  }');
   assert.equal(md, 'hello world');
 });
+
+test('toBase64 / fromBase64 round-trip binary data', () => {
+  const bytes = new Uint8Array([0, 1, 127, 128, 255, 42]);
+  const b64 = T.toBase64(bytes);
+  assert.equal(typeof b64, 'string');
+  assert.ok(b64.length > 0);
+  const decoded = T.fromBase64(b64);
+  assert.deepEqual([...decoded], [...bytes]);
+});
+
+test('toBase64 handles empty input', () => {
+  const b64 = T.toBase64(new Uint8Array(0));
+  assert.equal(b64, '');
+  assert.deepEqual([...T.fromBase64(b64)], []);
+});
+
+test('fromBase64Into writes into buffer at offset', () => {
+  const bytes = new Uint8Array([10, 20, 30]);
+  const b64 = T.toBase64(bytes);
+  const buffer = new Uint8Array(10);
+  const newOffset = T.fromBase64Into(b64, buffer, 3);
+  assert.equal(newOffset, 6);
+  assert.deepEqual([...buffer.slice(3, 6)], [10, 20, 30]);
+  assert.equal(buffer[0], 0, 'bytes before offset must be untouched');
+});
+
+test('getLanguageTag returns correct tags for known extensions', () => {
+  assert.equal(T.getLanguageTag('.py'), 'python');
+  assert.equal(T.getLanguageTag('.js'), 'javascript');
+  assert.equal(T.getLanguageTag('.json'), 'json');
+  assert.equal(T.getLanguageTag('.md'), 'markdown');
+  assert.equal(T.getLanguageTag('.xyz'), '');
+});
+
+test('sanitizeAndEscapeCell combines both escaping steps', () => {
+  assert.equal(T.sanitizeAndEscapeCell('=cmd'), '`=cmd`');
+  assert.equal(T.sanitizeAndEscapeCell('a|b'), 'a\\|b');
+  assert.equal(T.sanitizeAndEscapeCell(null), '');
+});
