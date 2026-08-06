@@ -1,0 +1,34 @@
+name: Supply Chain Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run weekly on Friday at 06:00 UTC
+    - cron: '0 6 * * 5'
+
+permissions:
+  contents: read
+
+jobs:
+  osv-scanner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run OSV Scanner
+        uses: google/osv-scanner-action/osv-scanner@v1
+        with:
+          scan-args: |-
+            --lockfile=package-lock.json
+            --skip-git
+        continue-on-error: true
+
+      - name: Verify pinned libraries (SHA-256)
+        run: |
+          npm ci
+          npm run verify:libs
