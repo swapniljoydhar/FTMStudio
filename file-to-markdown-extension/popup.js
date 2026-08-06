@@ -104,7 +104,7 @@
       if (error) {
         config = previous;
         setSaveStatus('Not saved', true);
-        console.error('[FTM Studio] Settings save failed:', error.message);
+        console.error('[FTM Studio] Settings save failed:', error?.name || 'UnknownError');
       } else setSaveStatus('Saved', false);
       ownWriteTimestamps.delete(ts);
       // Remove after a short delay to cover the onChanged delivery window.
@@ -462,7 +462,7 @@
     const url = URL.createObjectURL(new Blob([JSON.stringify(history, null, 2)], { type: 'application/json' }));
     chrome.downloads.download({ url, filename: 'ftm-conversion-history.json', saveAs: true }, () => {
       const error = chrome.runtime.lastError;
-      if (error) console.error('[FTM Studio] History export failed:', error.message);
+      if (error) console.error('[FTM Studio] History export failed:', error?.name || 'UnknownError');
       URL.revokeObjectURL(url);
     });
     setTimeout(() => URL.revokeObjectURL(url), 5000);

@@ -66,6 +66,20 @@ The extension only activates on **AI and chatbot sites** by default — no annoy
 - **PDF Header/Footer Dedup** — repeated lines across pages removed
 - **Password-Protected PDFs** — clear error message instead of silent failure
 
+### Secrets and environment variables
+
+FTM Studio is a client-only extension and currently requires no runtime secrets
+or environment variables. It does not use Supabase, Stripe, OAuth, JWT signing,
+database connections, or third-party API credentials. Keep `.env` files local;
+`.env.example` documents the current no-variable configuration. Never place a
+service-role key, secret key, database connection string, OAuth client secret, or
+JWT signing secret in extension code or a browser-exposed environment variable.
+
+Git history warning: if a secret was ever hardcoded in an earlier revision,
+removing it from the current tree does not remove it from Git history. Rotate
+any previously hardcoded secrets immediately, then purge the exposed value from
+repository history as appropriate.
+
 ### Other Capabilities
 
 - **Streaming Transport** — files stream in 512KB chunks; only one chunk in memory at a time (~3× less RAM)
