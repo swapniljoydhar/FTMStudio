@@ -112,12 +112,6 @@
     }
   }
 
-  // Port cleanup on disconnect
-  function cleanupPort(port) {
-    if (!port) return;
-    try { port.disconnect(); } catch (_) {}
-  }
-
   class BridgeManager {
     constructor() {
       this.ports = new Map();
