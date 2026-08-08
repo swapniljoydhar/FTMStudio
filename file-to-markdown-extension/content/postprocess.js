@@ -286,7 +286,13 @@
       if (FTM.config.enforceHeadingHierarchy) text = this.enforceHeadingHierarchy(text);
       const rules = FTM.config.regexPipeline;
       if (!rules || !rules.length || text.length > FTM.CONSTANTS.MAX_PIPELINE_INPUT_BYTES) return text;
-      for (const rule of rules) text = this.applyRule(text, rule);
+      // Cumulative timing budget: abort pipeline if total regex time exceeds limit.
+      const budget = FTM.CONSTANTS.REGEX_BUDGET_MS;
+      const start = performance.now();
+      for (const rule of rules) {
+        if (performance.now() - start > budget) break;
+        text = this.applyRule(text, rule);
+      }
       return text;
     }
   };

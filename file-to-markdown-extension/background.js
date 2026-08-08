@@ -77,9 +77,11 @@ async function broadcast(updated) {
   const query = patterns.includes('<all_urls>') ? {} : { url: patterns.slice(0, FTM.CONSTANTS.MAX_MATCH_PATTERNS) };
   let tabs;
   try { tabs = await chrome.tabs.query(query); } catch (_) { tabs = []; }
-  for (const tab of tabs) {
-    if (!tab.id) continue;
-    chrome.tabs.sendMessage(tab.id, { type: FTM.MSG.CONFIG_UPDATE, config: updated }).catch(() => {});
+  // Cap broadcast to avoid flooding hundreds of tabs with config updates.
+  const limit = FTM.CONSTANTS.MAX_BROADCAST_TABS || 100;
+  for (let i = 0; i < Math.min(tabs.length, limit); i++) {
+    if (!tabs[i].id) continue;
+    chrome.tabs.sendMessage(tabs[i].id, { type: FTM.MSG.CONFIG_UPDATE, config: updated }).catch(() => {});
   }
 }
 
