@@ -19,7 +19,10 @@
       FTM.offscreen.retain();
       this.retained = true;
       this.port.onMessage.addListener((msg) => this.fromContent(msg));
-      this.port.onDisconnect.addListener(() => this.close());
+      this.port.onDisconnect.addListener(() => {
+        manager.remove(this.port.name);
+        this.close();
+      });
       this.open();
     }
 
@@ -109,5 +112,32 @@
     }
   }
 
+  // Port cleanup on disconnect
+  function cleanupPort(port) {
+    if (!port) return;
+    try { port.disconnect(); } catch (_) {}
+  }
+
+  class BridgeManager {
+    constructor() {
+      this.ports = new Map();
+    }
+
+    add(port) {
+      this.ports.set(port.name, port);
+    }
+
+    remove(name) {
+      this.ports.delete(name);
+    }
+
+    get(name) {
+      return this.ports.get(name);
+    }
+  }
+
+  const manager = new BridgeManager();
+
   FTM.Bridge = Bridge;
+  FTM.BridgeManager = BridgeManager;
 })();

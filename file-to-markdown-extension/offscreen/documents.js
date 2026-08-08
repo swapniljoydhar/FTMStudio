@@ -247,6 +247,20 @@
     } catch (_) { parts.push('*[Page ' + pageNum + ' could not be extracted]*\n\n'); }
   }
 
+  // Process PDF pages with controlled concurrency to avoid blocking.
+  async function processPdfPages(pdf, parts, batchSize = 4) {
+    for (let i = 1; i <= pdf.numPages; i += batchSize) {
+      const batch = [];
+      const end = Math.min(i + batchSize, pdf.numPages + 1);
+      for (let p = i; p < end; p++) {
+        if (pdf.numPages > 1) parts.push('\n---\n\n**Page ' + p + '**\n\n');
+        batch.push(pdfPage(pdf, p, parts));
+      }
+      await Promise.all(batch);
+      if (end % (batchSize * 2) === 0) await new Promise((r) => setTimeout(r, 0));
+    }
+  }
+
   // ── PDF canvas / OCR helpers ────────────────────────────────────────
 
   async function renderPageToCanvas(pdf, pageNum, scale) {
@@ -377,14 +391,9 @@
       return dedupPageHeaders(parts.join('').replace(/\n{3,}/g, '\n\n').trim(), pdf.numPages);
     }
 
-    // Normal path: layout-aware text extraction.
+    // Normal path: layout-aware text extraction with parallel page processing.
     const parts = [title, pageInfo];
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      if (pdf.numPages > 1) parts.push('\n---\n\n**Page ' + pageNum + '**\n\n');
-      await pdfPage(pdf, pageNum, parts);
-      // Yield every 5 pages to keep the offscreen document responsive.
-      if (pageNum % 5 === 0) await new Promise((r) => setTimeout(r, 0));
-    }
+    await processPdfPages(pdf, parts);
     await pdf.destroy();
     return dedupPageHeaders(parts.join('').replace(/\n{3,}/g, '\n\n').trim(), pdf.numPages);
   }
