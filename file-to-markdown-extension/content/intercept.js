@@ -197,16 +197,35 @@
     return new File([markdown], FTM.text.stem(file.name) + '.md', { type: mimeType, lastModified: Date.now() });
   }
 
+  // Concurrency limit for parallel file processing.
+  const MAX_CONCURRENT = 3;
+
   async function convertAll(session) {
-    const results = [];
-    for (const file of session.files) {
+    const files = session.files;
+    const results = new Array(files.length);
+    // Pre-resolve extensions for all files.
+    const metas = await Promise.all(files.map(async (file) => {
       const ext = FTM.text.getExtension(file.name).toLowerCase();
       const realExt = await effectiveExtension(file);
       const conversionExt = realExt !== ext ? realExt : ext;
       const category = FTM.EXTENSION_MAP[conversionExt];
       const enabled = category && FTM.config.categories && FTM.config.categories[category];
-      results.push(enabled ? await convertFile(file, conversionExt === ext ? undefined : conversionExt) : file);
+      return { file, ext, conversionExt, enabled };
+    }));
+
+    // Process files with bounded concurrency.
+    let index = 0;
+    async function next() {
+      while (index < metas.length) {
+        const i = index++;
+        const { file, ext, conversionExt, enabled } = metas[i];
+        results[i] = enabled
+          ? await convertFile(file, conversionExt === ext ? undefined : conversionExt)
+          : file;
+      }
     }
+    const workers = Array.from({ length: Math.min(MAX_CONCURRENT, files.length) }, () => next());
+    await Promise.all(workers);
     return results;
   }
 
