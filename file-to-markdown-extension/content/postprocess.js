@@ -181,7 +181,7 @@
     },
 
     stripFrontmatter(markdown) {
-      const match = /^---\r?\n(?:[^\n]*\r?\n)*?---(?:\r?\n|$)/.exec(markdown);
+      const match = /^---\r?\n(?:.*\r?\n)*?^---(?:\r?\n|$)/m.exec(markdown);
       if (!match || /^---\r?\n\r?\n/.test(markdown)) return markdown;
       return markdown.substring(match[0].length);
     },

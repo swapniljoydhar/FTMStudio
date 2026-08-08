@@ -9,6 +9,7 @@
 
 'use strict';
 
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -81,6 +82,7 @@ function load(files, options = {}) {
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     chrome,
+    crypto,
     location: { hostname: options.hostname || 'example.com' }
   };
   sandbox.self = sandbox;
@@ -124,6 +126,7 @@ function loadWithDOMParser(files, options = {}) {
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     chrome,
+    crypto,
     location: { hostname: options.hostname || 'example.com' },
     DOMParser: MockDOMParser  // Use mock DOMParser for testing
   };

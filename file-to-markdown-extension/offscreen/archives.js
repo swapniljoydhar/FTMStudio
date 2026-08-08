@@ -44,7 +44,7 @@
         // Neutralize javascript: URLs in href/src/action/formaction.
         if (['href', 'src', 'action', 'formaction'].includes(attr.name.toLowerCase())) {
           const val = attr.value.trim().toLowerCase();
-          if (val.startsWith('javascript:') || val.startsWith('data:text/html')) {
+          if (val.startsWith('javascript:') || val.startsWith('vbscript:') || val.startsWith('data:')) {
             el.removeAttribute(attr.name);
           }
         }

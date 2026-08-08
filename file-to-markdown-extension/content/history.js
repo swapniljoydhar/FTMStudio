@@ -6,6 +6,7 @@
 // ===========================================================================
 
 'use strict';
+/* global crypto */
 
 (() => {
   const FTM = (self.FTM = self.FTM || {});
@@ -26,7 +27,7 @@
         size: fileSize,
         extension,
         timestamp: new Date().toISOString(),
-        uid: Math.random().toString(36).substring(2, 8),
+        uid: Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => b.toString(36).padStart(2, '0')).join('').substring(0, 8),
         outputSize: outputSize || 0
       };
     },
