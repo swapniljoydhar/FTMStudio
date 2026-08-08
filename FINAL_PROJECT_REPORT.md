@@ -3,7 +3,7 @@
 **Version:** 3.0.0  
 **Architecture:** Manifest V3 Chrome Extension  
 **Status:** Release-ready, security-hardened, accessible
-**Tests:** 87 passing, lint clean
+**Tests:** 144 passing, lint clean
 
 ---
 
@@ -93,7 +93,7 @@ The receiver uses a single bounded buffer where a parser requires random access;
 
 ## Test Coverage
 
-87 tests across 8 files covering:
+144 tests across 11 files covering:
 - Config defaults, merge, prototype pollution
 - PDF line clustering, table detection, cell rendering
 - History privacy, merging, expiry
@@ -135,4 +135,4 @@ Studio source is licensed under [Apache-2.0](LICENSE).
 
 ---
 
-*Version 3.0.0 — 87 tests passing — 2026-08-02*
+*Version 3.0.0 — 144 tests passing — 2026-08-08*

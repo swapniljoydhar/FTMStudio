@@ -3,7 +3,7 @@
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue)](https://developer.chrome.com/docs/extensions/mv3/intro/)
 [![Privacy First](https://img.shields.io/badge/Privacy-100%25%20Local-green)]()
 [![Version](https://img.shields.io/badge/version-3.0.0-orange)]()
-[![Tests](https://img.shields.io/badge/tests-139%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-144%20passing-brightgreen)]()
 
 A **privacy-first**, **100% local** Chrome extension that intercepts file uploads on AI/chatbot websites and converts documents to structured Markdown **before data leaves your browser**. All processing happens client-side — no servers, no cloud, no tracking.
 
@@ -284,7 +284,7 @@ Upstream repos: [PDF.js](https://github.com/mozilla/pdf.js) · [Tesseract.js](ht
 
 ```bash
 npm install
-npm test          # node — 139 tests against the real sources
+npm test          # node — 144 tests against the real sources
 npm run lint      # eslint
 npm run verify:libs   # SHA-256 verification of the pinned parser libraries
 ```
@@ -329,7 +329,7 @@ FTMStudio/
 │   ├── popup.html / .js / .css    # Settings dashboard + splash + accordions
 │   ├── lib/                       # Pinned parser libraries
 │   └── icons/                     # Extension icons
-├── test/                          # 139 node:test cases
+├── test/                          # 144 node:test cases
 ├── package.json
 ├── README.md
 ├── LICENSE
@@ -362,4 +362,4 @@ for the dependency and attribution summary.
 
 ---
 
-*Version 3.0.0 — 139 tests passing*
+*Version 3.0.0 — 144 tests passing*

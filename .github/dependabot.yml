@@ -21,3 +21,10 @@ updates:
       - ci
     commit-message:
       prefix: "ci:"
+    # Constrain to minor/patch only — major bumps for actions/checkout
+    # and actions/setup-node are often bogus (e.g. v4→v7 doesn't exist).
+    ignore:
+      - dependency-name: "actions/checkout"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "actions/setup-node"
+        update-types: ["version-update:semver-major"]

@@ -29,7 +29,7 @@ Content scripts are registered dynamically by `sw/registrar.js` in the isolated 
 
 ## Verification
 
-- `npm test`: 87 passing
+- `npm test`: 144 passing
 - `npm run lint`: passing
 - `npm run build`: passing
 - `npm run verify:libs`: 11 pinned libraries verified

@@ -172,18 +172,21 @@
 
 ## Test Coverage
 
-87 tests across 8 test files:
+144 tests across 11 test files:
 
 | File | Tests | Coverage |
 |------|-------|----------|
 | `config.test.js` | 9 | Config defaults, merge, prototype pollution |
-| `documents.test.js` | 12 | PDF line clustering, table detection, cell rendering |
+| `documents.test.js` | 13 | PDF line clustering, table detection, cell rendering |
 | `history.test.js` | 5 | Privacy, merging, expiry, cap, failed write |
-| `pipeline.test.js` | 8 | Binary transport, oversized files, routing, formula injection |
+| `pipeline.test.js` | 9 | Binary transport, oversized files, routing, formula injection |
 | `postprocess.test.js` | 14 | Frontmatter, TOC, cover artifacts, heading hierarchy, ReDoS |
 | `sources.test.js` | 8 | Source compilation, manifest, service worker loading |
-| `text.test.js` | 19 | RTF parser, CSV sanitization, YAML, HTML entities, base64 |
+| `text.test.js` | 26 | RTF parser, CSV sanitization, YAML, HTML entities, base64 |
 | `worker.test.js` | 12 | Offscreen lifecycle, bridge, registrar, session protocol |
+| `converters.test.js` | 14 | Text, RTF, image, offscreen converters, CSV streaming |
+| `messages.test.js` | 28 | BEGIN/CHUNK/END validation, ACK, RESULT, port trust |
+| `archives.test.js` | 6 | EPUB and PPTX parser registration and error handling |
 
 ---
 
@@ -199,4 +202,4 @@ Licensing and third-party attribution are documented in [LICENSE](LICENSE),
 
 ---
 
-*Audit: 2026-08-03 · Version: 3.0.0 · Tests: 87 passing*
+*Audit: 2026-08-08 · Version: 3.0.0 · Tests: 144 passing*
