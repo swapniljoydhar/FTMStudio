@@ -57,6 +57,8 @@
         out.categories = this.assign({ ...(base.categories || {}) }, categories);
       }
       out.regexPipeline = this.sanitizeRules(out.regexPipeline);
+      // Always clear effectiveHosts cache on merge.
+      delete out._effectiveHostsCache;
       return out;
     },
 
@@ -84,6 +86,8 @@
 
     // FIX Perf: Returns a Set (not an array) for O(1) lookups.
     effectiveHosts(config) {
+      // Cache the Set per config snapshot to avoid repeated allocation.
+      if (config._effectiveHostsCache) return config._effectiveHostsCache;
       const hosts = new Set([
         ...FTM.AI_HOSTS.map((h) => h.toLowerCase()),
         ...this.domainList(config.domainWhitelist)
@@ -96,6 +100,7 @@
         if (raw[0] === '+') hosts.add(domain);
         if (raw[0] === '-') hosts.delete(domain);
       }
+      config._effectiveHostsCache = hosts;
       return hosts;
     }
   };

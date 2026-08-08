@@ -16,6 +16,7 @@
   FTM.history = {
     pending: [],
     timer: null,
+    _persistMutex: Promise.resolve(),
 
     entry(fileName, fileSize, extension, outputSize) {
       // Privacy: store only extension + size, not the full filename.
@@ -58,15 +59,19 @@
       const batch = this.pending;
       if (!batch.length) return;
       this.pending = [];
-      try {
-        const stored = await chrome.storage.local.get('conversionHistory');
-        let merged = FTM.text.mergeHistory(stored && stored.conversionHistory, batch, this.max());
-        // Auto-expire old entries.
-        merged = this.expireOld(merged);
-        await chrome.storage.local.set({ conversionHistory: merged });
-      } catch (_) {
-        this.pending = batch.concat(this.pending);
-      }
+      // Serialize writes to prevent race conditions between concurrent tabs.
+      this._persistMutex = this._persistMutex.then(async () => {
+        try {
+          const stored = await chrome.storage.local.get('conversionHistory');
+          let merged = FTM.text.mergeHistory(stored && stored.conversionHistory, batch, this.max());
+          // Auto-expire old entries.
+          merged = this.expireOld(merged);
+          await chrome.storage.local.set({ conversionHistory: merged });
+        } catch (_) {
+          this.pending = batch.concat(this.pending);
+        }
+      }).catch(() => {});
+      return this._persistMutex;
     },
 
     flush() {

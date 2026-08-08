@@ -97,6 +97,12 @@
     }
     .ftm-error-title { font-size: 12px; font-weight: 600; color: #d93025; margin-bottom: 4px; }
     .ftm-error-msg { font-size: 10px; color: #9d9da8; word-break: break-word; margin-bottom: 8px; }
+    @media (prefers-reduced-motion: reduce) {
+      .ftm-toast { transition: opacity 0.1s ease !important; transform: none !important; }
+      .ftm-toast-progress-bar { animation-duration: 0.01s !important; }
+      .ftm-btn { transition: none !important; }
+      .ftm-spinner { animation-duration: 1.5s !important; }
+    }
   `;
 
   function meta(fileName) {

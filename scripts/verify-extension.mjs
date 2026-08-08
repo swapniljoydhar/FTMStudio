@@ -18,7 +18,7 @@ const declared = [...(manifest.background ? [manifest.background.service_worker]
 for (const file of declared) if (!(await readFile(join(root, file)).catch(() => null))) throw new Error(`Missing manifest file: ${file}`);
 for (const file of files.filter((file) => file.endsWith('.js'))) {
   const source = await readFile(file, 'utf8');
-  if (/innerHTML|document\.write|\beval\s*\(|new Function/.test(source)) throw new Error(`Unsafe sink: ${relative(root, file)}`);
+  if (/innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\s*\(|new Function/.test(source)) throw new Error(`Unsafe sink: ${relative(root, file)}`);
   const result = spawnSync(process.execPath, ['--check', file], { stdio: 'inherit' });
   if (result.status !== 0) throw new Error(`Syntax error: ${relative(root, file)}`);
 }

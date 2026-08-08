@@ -126,7 +126,7 @@
   }
 
   function clear(node) {
-    while (node.firstChild) node.removeChild(node.firstChild);
+    node.replaceChildren();
   }
 
   function overrides() {
@@ -543,10 +543,17 @@
     bindFields();
     bindCollapsibles();
     await load();
-    renderSettings();
-    renderSites();
-    renderRules();
-    renderHistory();
+    // Error boundaries: each renderer is independent; a failure in one
+    // should not prevent the rest of the popup from loading.
+    const renderers = [
+      ['Settings', renderSettings],
+      ['Sites', renderSites],
+      ['Rules', renderRules],
+      ['History', renderHistory]
+    ];
+    for (const [name, fn] of renderers) {
+      try { fn(); } catch (err) { console.error('[FTM Studio] ' + name + ' render failed:', err); }
+    }
     chrome.storage.onChanged.addListener(onExternalChange);
   }
 

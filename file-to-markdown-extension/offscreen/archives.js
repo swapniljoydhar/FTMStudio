@@ -41,8 +41,8 @@
             attr.name.toLowerCase().startsWith('on')) {
           el.removeAttribute(attr.name);
         }
-        // Neutralize javascript: URLs in href/src/action.
-        if (['href', 'src', 'action'].includes(attr.name.toLowerCase())) {
+        // Neutralize javascript: URLs in href/src/action/formaction.
+        if (['href', 'src', 'action', 'formaction'].includes(attr.name.toLowerCase())) {
           const val = attr.value.trim().toLowerCase();
           if (val.startsWith('javascript:') || val.startsWith('data:text/html')) {
             el.removeAttribute(attr.name);
