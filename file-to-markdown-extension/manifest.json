@@ -15,7 +15,8 @@
     "<all_urls>"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
+    "extension_pages": "script-src 'self'; object-src 'self'",
+    "worker_src": "script-src 'self'"
   },
   "action": {
     "default_popup": "popup.html",
