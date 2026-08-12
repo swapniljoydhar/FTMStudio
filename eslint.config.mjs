@@ -6,9 +6,10 @@ const BROWSER = {
   setTimeout: 'readonly', clearTimeout: 'readonly', setInterval: 'readonly', clearInterval: 'readonly',
   fetch: 'readonly', Blob: 'readonly', File: 'readonly', FileReader: 'readonly', DataTransfer: 'readonly',
   DragEvent: 'readonly', Event: 'readonly', URL: 'readonly', DOMParser: 'readonly', Image: 'readonly',
+  addEventListener: 'readonly', crypto: 'readonly', FTM_BROWSER: 'readonly',
   TextDecoder: 'readonly', TextEncoder: 'readonly', btoa: 'readonly', atob: 'readonly',
   HTMLInputElement: 'readonly', importScripts: 'readonly', confirm: 'readonly', Papa: 'readonly', mammoth: 'readonly',
-  JSZip: 'readonly', XLSX: 'readonly', TurndownService: 'readonly', turndownPluginGfm: 'readonly'
+  XLSX: 'readonly', TurndownService: 'readonly', turndownPluginGfm: 'readonly'
 };
 
 const NODE = {

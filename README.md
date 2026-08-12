@@ -1,9 +1,9 @@
 # FTM Studio — File to Markdown Converter
 
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
-[![Privacy First](https://img.shields.io/badge/Privacy-100%25%20Local-green)]()
-[![Version](https://img.shields.io/badge/version-4.0.0-orange)]()
-[![Tests](https://img.shields.io/badge/tests-115%20passing-brightgreen)]()
+[![Privacy First](https://img.shields.io/badge/Privacy-100%25%20Local-green)](#privacy-model)
+[![Version](https://img.shields.io/badge/version-4.0.0-orange)](file-to-markdown-extension/manifest.json)
+[![Tests](https://img.shields.io/badge/tests-81%20passing-brightgreen)](#testing)
 
 A **privacy-first**, **local-first** browser extension that converts user-selected files into structured Markdown before you attach them anywhere. FTM Studio does not inject into websites, modify third-party upload controls, request access to arbitrary pages, or send document contents to a server.
 
@@ -34,7 +34,7 @@ The default format policy favors predictable conversion quality and bounded reso
 | **Spreadsheets** | `.csv`, `.xlsx`, `.xls` | Produces bounded Markdown tables with formula-like cell protection. |
 | **Source Code** | `.py`, `.js`, `.cpp`, `.css`, `.json`, `.xml` | Emits fenced Markdown code with a language tag where known. |
 
-EPUB, PPTX, images, OCR-heavy workflows, and ambiguous container formats are not exposed by the current default policy. They should only be reintroduced as separately tested optional modules with explicit page, object, pixel, archive, and memory budgets.
+EPUB, PPTX, images, and ambiguous container formats are not exposed by the current default policy. PDF conversion may use a bounded OCR fallback for scanned pages; it is capped by the active [resource budgets](file-to-markdown-extension/shared/constants.js). Any future parser module should be separately tested with explicit page, object, pixel, archive, and memory budgets.
 
 ### Security Features
 
@@ -140,7 +140,7 @@ The destination application receives a normal user-managed file. FTM Studio does
 
 ### RAM-Conscious Design
 
-The converter avoids the old page-interception transport and its Base64 bridge. The primary workflow keeps conversion state in one explicit page, processes one active job at a time, lazy-loads parser libraries, limits queue length, releases generated object URLs, and rejects oversized input or output. Parser-specific budgets remain a release requirement for any future OCR, image, EPUB, or PPTX module.
+The converter avoids the old page-interception transport and its Base64 bridge. The primary workflow keeps conversion state in one explicit page, processes one active job at a time, lazy-loads parser libraries, reuses configured conversion helpers, limits queue length, releases generated object URLs, and rejects oversized input or output. PDF page counts, scanned-PDF OCR pages, spreadsheet cells, CSV rows, and generated Markdown are bounded before or during processing.
 
 No extension can honestly guarantee zero latency, zero RAM growth, or zero quality loss for every arbitrary document and device. FTM Studio instead fails explicitly and keeps work bounded when a file exceeds the safe operating envelope.
 
@@ -194,12 +194,12 @@ The popup exposes settings for the local conversion workflow, including the mast
 
 ```bash
 npm install
-npm test              # 115 tests against the current sources
+npm test              # 81 tests against the current sources
 npm run build         # MV3 manifest and source-reference verification
 npm run verify:libs   # SHA-256 verification of pinned parser libraries
 ```
 
-The current validation baseline is **115 passing tests**, MV3 verification of **24 extension files**, and SHA-256 verification of **11 pinned libraries**. These checks do not replace browser-matrix testing, malformed-document fuzzing, or parser-specific memory testing.
+The current validation baseline is **81 passing tests**, MV3 verification of **22 extension files**, and SHA-256 verification of **10 pinned libraries**. These checks do not replace browser-matrix testing, malformed-document fuzzing, or parser-specific memory testing.
 
 ### Project Structure
 
@@ -224,7 +224,7 @@ FTMStudio/
 
 ### Future Work
 
-The next safe improvements are a browser-matrix CI job, parser-specific page/archive/cell/pixel budgets, true parser cancellation, malformed-file fixtures, golden conversion snapshots, an SBOM/license report, and separate Firefox Android packaging. These improvements should be completed before reintroducing OCR-heavy formats, images, EPUB, PPTX, or any automatic page integration.
+The next safe improvements are a browser-matrix CI job, true parser cancellation, malformed-file fixtures, golden conversion snapshots, an SBOM/license report, and separate Firefox Android packaging. See [Testing](#testing) for the current automated checks. Reintroducing images, EPUB, PPTX, or any automatic page integration should require separate modules with explicit resource budgets and independent security review.
 
 ---
 

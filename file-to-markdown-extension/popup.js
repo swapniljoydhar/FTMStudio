@@ -25,11 +25,12 @@
       setText($('save-status'), 'Saved');
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(() => setText($('save-status'), ''), 1800);
+      if (patch.conversionHistory) renderHistory();
     } catch (_) {
       config = previous;
       setText($('save-status'), 'Not saved');
+      render();
     }
-    render();
   }
 
   function renderFormats() {

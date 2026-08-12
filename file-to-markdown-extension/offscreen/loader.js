@@ -11,7 +11,6 @@
     turndown: { src: 'lib/turndown.min.js', global: 'TurndownService' },
     turndownGfm: { src: 'lib/turndown-plugin-gfm.min.js', global: 'turndownPluginGfm' },
     mammoth: { src: 'lib/mammoth.browser.min.js', global: 'mammoth' },
-    jszip: { src: 'lib/jszip.min.js', global: 'JSZip' },
     xlsx: { src: 'lib/xlsx.mini.min.js', global: 'XLSX' },
     papa: { src: 'lib/papaparse.min.js', global: 'Papa' }
   };
@@ -61,6 +60,7 @@
     },
 
     async turndown() {
+      if (this.loaded.has('turndownService')) return this.loaded.get('turndownService');
       const [Service, gfm] = await Promise.all([this.get('turndown'), this.get('turndownGfm')]);
       const converter = new Service({
         headingStyle: 'atx', codeBlockStyle: 'fenced', fence: '```',
@@ -69,6 +69,7 @@
       });
       if (gfm && gfm.gfm) converter.use(gfm.gfm);
       converter.addRule('noImages', { filter: ['img'], replacement: () => '\n![Image omitted]\n' });
+      this.loaded.set('turndownService', converter);
       return converter;
     },
 
@@ -89,12 +90,16 @@
       return worker;
     },
 
-    release() {
-      // Terminate Tesseract worker before clearing.
+    releaseTesseract() {
       const tess = this.loaded.get('tesseract');
       if (tess && typeof tess.terminate === 'function') {
         try { tess.terminate(); } catch (_) { /* ignore */ }
       }
+      this.loaded.delete('tesseract');
+    },
+
+    release() {
+      this.releaseTesseract();
       this.loaded.clear();
     }
   };
