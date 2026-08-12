@@ -1,59 +1,236 @@
-# FTM Studio
+# FTM Studio — File to Markdown Converter
 
-FTM Studio is a privacy-first Manifest V3 browser extension that converts user-selected files to Markdown locally. The current release intentionally does **not** inject into websites, intercept page upload controls, replace files in third-party dialogs, request host permissions, or upload document contents.
+[![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
+[![Privacy First](https://img.shields.io/badge/Privacy-100%25%20Local-green)]()
+[![Version](https://img.shields.io/badge/version-4.0.0-orange)]()
+[![Tests](https://img.shields.io/badge/tests-115%20passing-brightgreen)]()
 
-## Product model
+A **privacy-first**, **local-first** browser extension that converts user-selected files into structured Markdown before you attach them anywhere. FTM Studio does not inject into websites, modify third-party upload controls, request access to arbitrary pages, or send document contents to a server.
 
-Use the popup to open the **manual conversion workspace**. Choose one or more files, wait for local conversion, then download the generated `.md` file or drag the result link into an application that accepts a normal file drop. This preserves the destination site’s native upload behavior and avoids site-specific automation signals.
+The extension uses a deliberate workflow: choose a file in FTM Studio, convert it locally, then download or drag the generated `.md` file into your destination application yourself. This keeps the destination site’s native upload flow intact and avoids fragile site-specific automation behavior.
 
-The service worker is deliberately stateless. It bootstraps durable settings, synchronizes the action badge, and exits cleanly when idle. Conversion state lives in the explicit converter page, not in a background queue or service-worker global.
+---
 
-## Supported formats
+## Features
 
-The default allowlist is deliberately curated for predictable output and bounded memory use.
+### Manual Conversion Workspace
 
-| Group | Extensions | Notes |
+The converter is opened explicitly from the extension popup. It provides a real file picker, drag-and-drop input, a bounded queue, one active conversion at a time, cancellation state, progress feedback, and a result link that supports both normal download and drag-out workflows.
+
+- **Local file selection** — files are read inside the extension page.
+- **Bounded queue** — duplicate files are ignored and queue size is capped.
+- **RAM-conscious processing** — one conversion runs at a time by default, with hard input and output limits.
+- **Download or drag** — the generated Markdown is exposed as a normal downloadable object URL.
+- **Policy-neutral workflow** — FTM Studio does not rewrite AI-chat or website upload controls.
+- **Mobile-aware layout** — narrow screens, keyboard navigation, reduced motion, and dark color schemes are supported.
+
+### Supported Formats
+
+The default format policy favors predictable conversion quality and bounded resource use over an unnecessarily large feature list.
+
+| Category | Extensions | Output behavior |
 |---|---|---|
-| Documents | `.pdf`, `.docx`, `.txt`, `.md`, `.rtf`, `.html` | PDF/DOCX use lazy local parsers; HTML is converted locally. |
-| Data | `.csv`, `.xlsx`, `.xls` | Tables are bounded and formula-like cells are escaped. |
-| Source | `.py`, `.js`, `.cpp`, `.css`, `.json`, `.xml` | Source files are emitted as fenced Markdown code. |
+| **Documents** | `.pdf`, `.docx`, `.txt`, `.md`, `.rtf`, `.html` | Converts document text and structure to Markdown. |
+| **Spreadsheets** | `.csv`, `.xlsx`, `.xls` | Produces bounded Markdown tables with formula-like cell protection. |
+| **Source Code** | `.py`, `.js`, `.cpp`, `.css`, `.json`, `.xml` | Emits fenced Markdown code with a language tag where known. |
 
-EPUB, PPTX, images, OCR-heavy workflows, and ambiguous container formats are intentionally excluded from the primary allowlist until they have separate quality tests and resource budgets. Unsupported formats are not exposed by the UI.
+EPUB, PPTX, images, OCR-heavy workflows, and ambiguous container formats are not exposed by the current default policy. They should only be reintroduced as separately tested optional modules with explicit page, object, pixel, archive, and memory budgets.
 
-## Security and privacy design
+### Security Features
 
-The manifest requests only `storage`. It has no host permissions, content scripts, scripting permission, optional all-sites permission, offscreen permission, downloads permission, or web-accessible parser resources. All libraries are loaded from extension-local files. PDF.js runs with evaluation disabled, and library hashes are verified by the repository integrity check.
+- **Least-privilege manifest** — only `storage` permission is requested; there are no host permissions, content scripts, dynamic script registration, offscreen permission, downloads permission, or web-accessible parser resources.
+- **Binary disguise checks** — text conversion checks magic signatures and null-byte density before treating content as text.
+- **Parser hardening** — PDF.js evaluation is disabled and parser libraries are loaded locally and lazily.
+- **Input and output limits** — file, text, queue, history, and generated Markdown sizes are bounded.
+- **Configuration validation** — persisted settings are normalized, prototype keys are rejected, and regex/domain values are bounded.
+- **ReDoS protection** — custom post-processing rules are screened and constrained before execution.
+- **CSV formula protection** — formula-like spreadsheet cells are escaped into Markdown-safe code spans.
+- **DOM-safe rendering** — filenames, errors, settings, and history values are rendered with DOM text APIs rather than HTML injection.
+- **Pinned libraries** — vendored parser files are checked against the SHA-256 lockfile.
 
-Input size, queue length, output size, parser work, and history size are bounded. Conversion history stores only redacted extension labels, sizes, timestamps, and output sizes; it does not store document names or Markdown content. The UI uses text-based DOM APIs rather than HTML injection, and no dynamic code execution is used by first-party source.
+### Conversion Quality
 
-## Browser and mobile scope
+- **Layout-aware PDF extraction** — text items are clustered and aligned where the parser has sufficient layout information.
+- **DOCX conversion** — document structure is converted through the local Mammoth-based parser.
+- **RTF parsing** — local RTF conversion handles common formatting and nested groups.
+- **HTML cleanup** — HTML is converted locally and post-processed into readable Markdown.
+- **Heading normalization** — post-processing can normalize heading levels and remove common table-of-contents artifacts.
+- **Table output** — CSV and spreadsheet data are converted into Markdown tables with cell escaping.
+- **Frontmatter option** — optional YAML metadata can be added through settings, subject to safe serialization rules.
+- **Explicit failure states** — unsupported, oversized, malformed, encrypted, or parser-failed files report an error instead of silently producing misleading output.
 
-Chrome and Chromium desktop MV3 are the primary target. The source uses a small `chrome`/`browser` API adapter so Firefox desktop packaging can be maintained without scattering namespace conditionals through the code. Firefox Android support requires a separate compatibility build because Android browser extension APIs and MV3 service-worker support do not have full desktop parity. Chrome Android does not provide the same general extension-installation model as desktop Chrome, so a universal Chrome Android extension guarantee is not technically valid.
+### Privacy-Preserving History
 
-No extension can guarantee zero latency or zero quality loss for every arbitrary document, device, browser, and destination application. The implementation instead uses lazy parser loading, one active conversion at a time, hard budgets, cancellation hooks, and explicit errors to avoid uncontrolled RAM growth and silent corruption.
+Conversion history is local and redacted. It stores only an extension-derived label such as `*.pdf`, file size, timestamp, a random entry identifier, and output size. It does not store the original filename or converted Markdown content. Entries are debounced, merged safely, capped, and expired after the configured retention period.
+
+### Stateless Background Service Worker
+
+The Manifest V3 worker is intentionally small and event-driven. It initializes durable settings, synchronizes the toolbar badge, and tolerates browser shutdowns and restarts without owning document data, conversion queues, ports, or parser state.
+
+---
+
+## Installation
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/swapniljoydhar/FTMStudio.git
+   cd FTMStudio
+   ```
+
+2. Open the extensions page in a desktop Chromium-based browser.
+3. Enable **Developer mode**.
+4. Choose **Load unpacked** and select the `file-to-markdown-extension` folder.
+5. Open the FTM Studio popup and choose **Open converter**.
+
+**Primary target:** Chrome and Chromium desktop with Manifest V3 support.
+
+### Permissions
+
+The extension requests only the `storage` permission. It does not request `<all_urls>`, host permissions, `scripting`, `offscreen`, `downloads`, or tab access. No page content is inspected or modified by the current build.
+
+Firefox desktop can use the shared `chrome`/`browser` adapter, but should be validated against the target Firefox release. Firefox Android requires a separate compatibility build because Android extension APIs and Manifest V3 service-worker behavior do not have full desktop parity. Chrome Android does not provide the same general extension-installation model as desktop Chrome, so a universal Chrome Android guarantee is not technically valid.
+
+---
+
+## How It Works
+
+### The User Workflow
+
+1. Open FTM Studio from the browser toolbar.
+2. Open the manual conversion workspace.
+3. Choose files with the picker or drop them onto the converter.
+4. FTM Studio validates the extension, size, and basic content signature.
+5. The converter selects a local parser and runs one bounded job at a time.
+6. Post-processing normalizes the Markdown, applies safe settings, and enforces the output limit.
+7. Download the `.md` result or drag its result link into a destination application.
+
+The destination application receives a normal user-managed file. FTM Studio does not cancel events, replace `input.files`, redispatch upload events, access arbitrary site DOMs, or use clipboard fallbacks to simulate an attachment.
+
+### Architecture
+
+```text
+┌────────────────────────────────────────────────────────┐
+│  Extension Popup                                       │
+│  popup.html + popup.js + popup.css                     │
+│  Settings, format policy, badge state, redacted history │
+└────────────────────────┬───────────────────────────────┘
+                         │ opens explicit converter page
+                         ▼
+┌────────────────────────────────────────────────────────┐
+│  Manual Converter Page                                 │
+│  convert.html + convert.js + convert.css                │
+│  File picker, drop zone, bounded queue, output handle   │
+└────────────────────────┬───────────────────────────────┘
+                         │ local function calls
+                         ▼
+┌────────────────────────────────────────────────────────┐
+│  Shared + Parser Modules                                │
+│  browser adapter, config, text helpers, post-processing  │
+│  lazy local document, spreadsheet, PDF, and RTF parsers  │
+└────────────────────────┬───────────────────────────────┘
+                         │ durable settings and badge only
+                         ▼
+┌────────────────────────────────────────────────────────┐
+│  Stateless MV3 Service Worker                          │
+│  background.js                                         │
+│  lifecycle bootstrap, storage normalization, badge sync │
+└────────────────────────────────────────────────────────┘
+```
+
+### RAM-Conscious Design
+
+The converter avoids the old page-interception transport and its Base64 bridge. The primary workflow keeps conversion state in one explicit page, processes one active job at a time, lazy-loads parser libraries, limits queue length, releases generated object URLs, and rejects oversized input or output. Parser-specific budgets remain a release requirement for any future OCR, image, EPUB, or PPTX module.
+
+No extension can honestly guarantee zero latency, zero RAM growth, or zero quality loss for every arbitrary document and device. FTM Studio instead fails explicitly and keeps work bounded when a file exceeds the safe operating envelope.
+
+---
+
+## Configuration
+
+The popup exposes settings for the local conversion workflow, including the master state, Markdown output behavior, frontmatter preference, image/parser policy where applicable, supported-format policy, and privacy-preserving history controls.
+
+| Control area | Purpose |
+|---|---|
+| **General** | Enable or disable the extension and manage core output behavior. |
+| **Formats** | Keep only the supported conversion categories needed for the user’s workflow. |
+| **Output** | Configure post-processing and optional frontmatter behavior. |
+| **History** | Review redacted local conversion metadata or clear it. |
+
+---
+
+## Security and Privacy
+
+### Privacy Model
+
+- **Local document processing** — document bytes are handled by extension-local code.
+- **No document upload service** — there is no server endpoint, cloud converter, or runtime API credential.
+- **No page access** — the manifest does not grant arbitrary host access.
+- **No telemetry claim** — the extension source contains no first-party analytics or tracking pipeline.
+- **Redacted history** — history does not retain raw document names or Markdown content.
+- **Strict extension CSP** — scripts and parser resources remain extension-local.
+
+### Threat Mitigations
+
+| Threat | Mitigation |
+|---|---|
+| Arbitrary-site code execution | No host permissions, content scripts, or dynamic registration. |
+| Upload automation detection | Manual converter and normal user-managed download/drag workflow. |
+| ReDoS | Bounded rule count/size and existing unsafe-pattern screening. |
+| CSV formula injection | Risky cells are rendered as Markdown-safe code. |
+| YAML/frontmatter injection | Values are normalized and serialized through safe helpers. |
+| Binary disguise | Magic-byte and null-byte checks before text conversion. |
+| Large-file denial of service | Input, queue, parser, and output budgets. |
+| Service-worker restart loss | Conversion state is not owned by the service worker. |
+| Unsafe UI rendering | `textContent` and DOM construction instead of HTML sinks. |
+| Library tampering | SHA-256 verification for pinned vendored libraries. |
+| History privacy leak | Extension-only labels, capped entries, expiry, and no content storage. |
+
+---
 
 ## Development
 
+### Testing
+
 ```bash
 npm install
-npm test
-npm run build
-npm run verify:libs
+npm test              # 115 tests against the current sources
+npm run build         # MV3 manifest and source-reference verification
+npm run verify:libs   # SHA-256 verification of pinned parser libraries
 ```
 
-`npm test` runs the unit and source-structure suite. `npm run build` verifies that the MV3 manifest references only existing files and that the extension has no forbidden legacy references. `npm run verify:libs` checks the SHA-256 lockfile for every vendored parser library.
+The current validation baseline is **115 passing tests**, MV3 verification of **24 extension files**, and SHA-256 verification of **11 pinned libraries**. These checks do not replace browser-matrix testing, malformed-document fuzzing, or parser-specific memory testing.
 
-Load `file-to-markdown-extension/` as an unpacked extension in a desktop Chromium-based browser. For Firefox, validate the same source against the target Firefox version and maintain a browser-specific manifest if a release requires event-page behavior on Firefox Android.
+### Project Structure
 
-## Repository structure
+```text
+FTMStudio/
+├── file-to-markdown-extension/
+│   ├── manifest.json              # Least-privilege MV3 manifest
+│   ├── background.js              # Stateless service worker
+│   ├── convert.html               # Manual conversion workspace
+│   ├── convert.js                 # Bounded queue and local dispatch
+│   ├── convert.css                # Responsive converter UI
+│   ├── popup.html                 # Settings and converter entry point
+│   ├── popup.js / popup.css       # Settings controller and compact UI
+│   ├── shared/                    # Adapter, constants, config, text, schemas
+│   ├── content/                   # Local converters, history, post-processing
+│   ├── offscreen/                 # Lazy parser loaders and document parsers
+│   └── lib/                       # Vendored libraries and SHA-256 lockfile
+├── test/                          # Unit, security-boundary, and source tests
+├── AUDIT_REPORT.md                # Detailed vulnerability and remediation report
+└── package.json                   # Test and verification commands
+```
 
-| Path | Responsibility |
-|---|---|
-| `background.js` | Stateless event-driven worker for durable settings and badge state. |
-| `convert.html`, `convert.js`, `convert.css` | Manual file picker, bounded queue, local conversion, download/drag output. |
-| `popup.html`, `popup.js`, `popup.css` | Settings, format policy, and redacted local history. |
-| `shared/` | Constants, text helpers, config validation, message schemas, and API adapter. |
-| `content/` | Reusable local text/RTF converters, post-processing, and history persistence; no page injection. |
-| `offscreen/` | Lazy local parser loaders and document/table conversion functions used by the converter page. |
-| `lib/` | Vendored parser libraries validated by `lib/lockfile.json`. |
-| `test/` | Production-source tests, parser tests, security-boundary tests, and packaging checks. |
+### Future Work
+
+The next safe improvements are a browser-matrix CI job, parser-specific page/archive/cell/pixel budgets, true parser cancellation, malformed-file fixtures, golden conversion snapshots, an SBOM/license report, and separate Firefox Android packaging. These improvements should be completed before reintroducing OCR-heavy formats, images, EPUB, PPTX, or any automatic page integration.
+
+---
+
+## References
+
+[1]: https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3 "Chrome Manifest V3 overview"
+[2]: https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle "Chrome extension service-worker lifecycle"
+[3]: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Content_scripts "MDN WebExtensions content scripts"
+[4]: https://extensionworkshop.com/documentation/develop/developing-extensions-for-firefox-for-android/ "Mozilla Firefox for Android extension guidance"
