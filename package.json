@@ -1,11 +1,11 @@
 {
   "name": "ftm-studio",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "private": true,
   "license": "Apache-2.0",
-  "description": "FTM Studio — privacy-first file-to-Markdown Chrome extension",
+  "description": "FTM Studio — privacy-first local file-to-Markdown WebExtension",
   "scripts": {
-    "test": "node --test test/config.test.js test/documents.test.js test/history.test.js test/pipeline.test.js test/postprocess.test.js test/sources.test.js test/text.test.js test/worker.test.js test/converters.test.js test/messages.test.js test/archives.test.js",
+    "test": "node --test test/config.test.js test/documents.test.js test/history.test.js test/pipeline.test.js test/postprocess.test.js test/sources.test.js test/text.test.js test/converters.test.js test/messages.test.js test/archives.test.js",
     "build": "node scripts/verify-extension.mjs",
     "lint": "eslint .",
     "verify:libs": "node scripts/verify-libs.mjs"
@@ -13,7 +13,5 @@
   "devDependencies": {
     "eslint": "^10.8.0"
   },
-  "engines": {
-    "node": ">=20"
-  }
+  "engines": { "node": ">=20" }
 }

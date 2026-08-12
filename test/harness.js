@@ -150,7 +150,7 @@ function loadShared(options) {
 }
 
 function loadContent(options) {
-  return load([...SHARED, 'content/config.js', 'content/activation.js', 'content/postprocess.js', 'content/history.js'], options);
+  return load([...SHARED, 'content/config.js', 'content/postprocess.js', 'content/converters.js', 'content/history.js'], options);
 }
 
 function loadArchives(options) {

@@ -5,111 +5,42 @@ const assert = require('node:assert/strict');
 const { load, SHARED } = require('./harness');
 
 function loadConverters(options) {
-  return load([...SHARED, 'content/config.js', 'content/router.js', 'content/converters.js'], options);
+  return load([...SHARED, 'content/converters.js'], options);
 }
 
-// ── converters are registered ─────────────────────────────────────────
+function file(name, content, size = Buffer.byteLength(content)) {
+  return { name, size, text: async () => content, slice: () => ({ arrayBuffer: async () => new TextEncoder().encode(content).buffer }) };
+}
 
-test('converters object exists', () => {
-  const { FTM } = loadConverters({ hostname: 'chatgpt.com' });
-  assert.ok(FTM.converters, 'converters should be defined');
-  assert.equal(typeof FTM.converters, 'object');
-});
-
-test('text converter is a function', () => {
-  const { FTM } = loadConverters({ hostname: 'chatgpt.com' });
+test('bounded converter API exposes text and RTF only', () => {
+  const { FTM } = loadConverters();
   assert.equal(typeof FTM.converters.text, 'function');
-});
-
-test('rtf converter is a function', () => {
-  const { FTM } = loadConverters({ hostname: 'chatgpt.com' });
   assert.equal(typeof FTM.converters.rtf, 'function');
+  assert.equal(FTM.converters.image, undefined);
+  assert.equal(FTM.converters.offscreen, undefined);
 });
 
-test('image converter is a function', () => {
-  const { FTM } = loadConverters({ hostname: 'chatgpt.com' });
-  assert.equal(typeof FTM.converters.image, 'function');
+test('text converter emits fenced source and JSON', async () => {
+  const { FTM } = loadConverters();
+  assert.match(await FTM.converters.text(file('a.js', 'const x = 1;'), '.js'), /```javascript[\s\S]*const x = 1/);
+  assert.match(await FTM.converters.text(file('a.json', '{"ok":true}'), '.json'), /```json[\s\S]*"ok": true/);
 });
 
-test('offscreen converter is a function', () => {
-  const { FTM } = loadConverters({ hostname: 'chatgpt.com' });
-  assert.equal(typeof FTM.converters.offscreen, 'function');
+test('RTF converter returns Markdown', async () => {
+  const { FTM } = loadConverters();
+  assert.match(await FTM.converters.rtf(file('a.rtf', '{\\rtf1\\b Bold}')), /Bold/);
 });
 
-test('csvStreams is a function', () => {
-  const { FTM } = loadConverters({ hostname: 'chatgpt.com' });
-  assert.equal(typeof FTM.converters.csvStreams, 'function');
+test('text and RTF converters reject oversized files before reading', async () => {
+  const { FTM } = loadConverters();
+  const huge = { name: 'big.txt', size: FTM.CONSTANTS.MAX_TEXT_READ_SIZE_BYTES + 1, text: async () => { throw new Error('must not read'); }, slice: () => ({ arrayBuffer: async () => new ArrayBuffer(0) }) };
+  await assert.rejects(() => FTM.converters.text(huge, '.txt'), /File too large/i);
+  await assert.rejects(() => FTM.converters.rtf({ ...huge, name: 'big.rtf' }), /File too large/i);
 });
 
-// ── csvStreams threshold logic ─────────────────────────────────────────
-
-test('csvStreams returns false for small files', () => {
-  const { FTM } = loadConverters({ hostname: 'chatgpt.com' });
-  const file = { name: 'small.csv', size: 1024 };
-  assert.equal(FTM.converters.csvStreams(file), false);
-});
-
-test('csvStreams returns true for large files', () => {
-  const { FTM } = loadConverters({ hostname: 'chatgpt.com' });
-  const mb = FTM.CONSTANTS.CSV_STREAM_THRESHOLD_MB_DEFAULT;
-  const file = { name: 'large.csv', size: mb * FTM.CONSTANTS.MB + 1 };
-  assert.equal(FTM.converters.csvStreams(file), true);
-});
-
-test('csvStreams respects custom csvStreamThreshold config', () => {
-  const { FTM } = loadConverters({ hostname: 'chatgpt.com' });
-  FTM.config.csvStreamThreshold = 1; // 1MB threshold
-  const smallFile = { name: 'small.csv', size: 500 * 1024 }; // 500KB
-  const largeFile = { name: 'large.csv', size: 2 * FTM.CONSTANTS.MB }; // 2MB
-  assert.equal(FTM.converters.csvStreams(smallFile), false);
-  assert.equal(FTM.converters.csvStreams(largeFile), true);
-});
-
-// ── offscreen delegates to transport ───────────────────────────────────
-
-test('offscreen converter is registered for docx', () => {
-  const { FTM } = loadConverters({ hostname: 'chatgpt.com' });
-  // The offscreen converter exists - it will call transport.convert internally
-  assert.equal(typeof FTM.converters.offscreen, 'function');
-});
-
-test('converters has dataUrl method', () => {
-  const { FTM } = loadConverters({ hostname: 'chatgpt.com' });
-  assert.equal(typeof FTM.converters.dataUrl, 'function');
-});
-
-// ── text converter rejects binary files ────────────────────────────────
-
-test('text converter throws for oversized text files', async () => {
-  const { FTM } = loadConverters({ hostname: 'chatgpt.com' });
-  const file = {
-    name: 'big.txt',
-    size: FTM.CONSTANTS.MAX_TEXT_READ_SIZE_BYTES + 1,
-    slice: () => ({ arrayBuffer: async () => new ArrayBuffer(0) })
-  };
-  await assert.rejects(() => FTM.converters.text(file, '.txt'), /File too large/i);
-});
-
-// ── rtf converter rejects oversized files ────────────────────────────────
-
-test('rtf converter throws for oversized RTF files', async () => {
-  const { FTM } = loadConverters({ hostname: 'chatgpt.com' });
-  const file = {
-    name: 'big.rtf',
-    size: FTM.CONSTANTS.MAX_TEXT_READ_SIZE_BYTES + 1,
-    slice: () => ({ arrayBuffer: async () => new ArrayBuffer(0) })
-  };
-  await assert.rejects(() => FTM.converters.rtf(file), /File too large/i);
-});
-
-// ── image converter rejects oversized images ────────────────────────────
-
-test('image converter throws for oversized image files', async () => {
-  const { FTM } = loadConverters({ hostname: 'chatgpt.com' });
-  const file = {
-    name: 'big.png',
-    size: FTM.CONSTANTS.MAX_IMAGE_SIZE_BYTES + 1,
-    slice: () => ({ arrayBuffer: async () => new ArrayBuffer(0) })
-  };
-  await assert.rejects(() => FTM.converters.image(file), /File too large/i);
+test('text converter rejects binary signatures', async () => {
+  const { FTM } = loadConverters();
+  const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37]);
+  const binary = { name: 'fake.txt', size: FTM.CONSTANTS.SNIFF_BYTES + 1, text: async () => 'not used', slice: () => ({ arrayBuffer: async () => bytes.buffer }) };
+  await assert.rejects(() => FTM.converters.text(binary, '.txt'), /signature/i);
 });

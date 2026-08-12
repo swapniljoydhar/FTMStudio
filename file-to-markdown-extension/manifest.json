@@ -1,23 +1,10 @@
 {
   "manifest_version": 3,
   "name": "FTM Studio",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "minimum_chrome_version": "116",
-  "description": "Elegant file-to-Markdown converter for AI chatbots. Privacy-first, client-side conversion with a beautiful UI.",
-  "permissions": [
-    "storage",
-    "offscreen",
-    "scripting",
-    "downloads"
-  ],
-  "host_permissions": [],
-  "optional_host_permissions": [
-    "<all_urls>"
-  ],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'",
-    "worker_src": "script-src 'self'"
-  },
+  "description": "Private, local file-to-Markdown conversion with an explicit download-and-drag workflow.",
+  "permissions": ["storage"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -33,5 +20,8 @@
   },
   "background": {
     "service_worker": "background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
   }
 }

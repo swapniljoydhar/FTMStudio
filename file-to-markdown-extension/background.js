@@ -1,126 +1,42 @@
+// background.js — stateless MV3 service worker
 // ===========================================================================
-// background.js — Service worker entry point
-// ===========================================================================
-// FIX #3 (Medium): onInstalled listener now returns the Promise so Chrome
-//   keeps the service worker alive until seedConfig + sync complete.
-// FIX #4 (Medium): registrar.sync() is serialized via a mutex to prevent
-//   concurrent unregister/register races from onStartup + onInstalled.
-// FIX #6 (Perf): broadcast() reuses the config from relevantChanges()
-//   instead of doing a redundant chrome.storage.local.get(null).
-// ===========================================================================
+// The worker owns only durable configuration bootstrap and the badge. It does
+// not keep jobs, files, parser state, ports, timers, tab lists, or registrations
+// in memory. The manual converter runs in its own extension page and can be
+// reopened after a browser restart without relying on worker state.
 
 'use strict';
 
-importScripts(
-  'shared/constants.js',
-  'shared/text.js',
-  'shared/config.js',
-  'shared/messages.js',
-  'sw/offscreen-manager.js',
-  'sw/bridge.js',
-  'sw/registrar.js'
-);
+importScripts('shared/browser.js', 'shared/constants.js', 'shared/config.js');
 
 const FTM = self.FTM;
+const API = self.FTM_BROWSER.api;
 
-// Keys that change which pages must be instrumented.
-const REGISTRATION_KEYS = ['enabled', 'smartMode', 'domainWhitelist', 'domainBlacklist', 'customAiHosts'];
-
-// FIX #4: Simple async mutex to serialize registrar.sync() calls.
-let syncMutex = Promise.resolve();
-let configCache = null;
-let broadcastTimer = null;
-let pendingBroadcast = {};
-
-function serializedSync(config) {
-  syncMutex = syncMutex.then(() => FTM.registrar.sync(config)).catch(() => {});
-  return syncMutex;
+async function ensureConfig() {
+  if (!FTM_BROWSER.storage) return FTM.configUtils.defaults({});
+  const stored = await FTM_BROWSER.storage.get(null);
+  const config = FTM.configUtils.defaults(stored || {});
+  const needsWrite = !stored || stored.enabled === undefined || stored.schemaVersion !== 4;
+  if (needsWrite) await FTM_BROWSER.storage.set({ ...config, schemaVersion: 4 });
+  return config;
 }
 
-async function seedConfig(reason) {
-  const stored = reason === 'install' ? {} : await chrome.storage.local.get(null);
-  configCache = FTM.configUtils.defaults(stored);
+async function updateBadge(enabled) {
+  if (!API.action) return;
   try {
-    await chrome.storage.local.set(configCache);
-  } catch (err) {
-    console.error('[FTM Studio] Config initialization failed:', err?.name || 'UnknownError');
-    throw err;
-  }
+    await FTM_BROWSER.call(API.action.setBadgeText, API.action, [{ text: enabled ? '' : 'OFF' }]);
+    await FTM_BROWSER.call(API.action.setBadgeBackgroundColor, API.action, [{ color: enabled ? '#22c55e' : '#98a2b3' }]);
+    await FTM_BROWSER.call(API.action.setTitle, API.action, [{ title: enabled ? 'FTM Studio — ready' : 'FTM Studio — disabled' }]);
+  } catch (_) { /* Badge APIs vary by browser and are non-essential. */ }
 }
 
-// FIX #3: Return the Promise chain so the service worker stays alive.
-chrome.runtime.onInstalled.addListener((details) => {
-  return seedConfig(details.reason).then(() => serializedSync(configCache));
-});
+API.runtime.onInstalled.addListener((details) => ensureConfig().then((config) => updateBadge(config.enabled !== false)).catch(() => {}));
+API.runtime.onStartup.addListener(() => ensureConfig().then((config) => updateBadge(config.enabled !== false)).catch(() => {}));
 
-chrome.runtime.onStartup.addListener(() => serializedSync());
-
-chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== FTM.PORT.CONTENT || (FTM.messages && !FTM.messages.isTrustedPort(port))) return;
-  new FTM.Bridge(port).start();
-});
-
-function relevantChanges(changes) {
-  const updated = {};
-  for (const [key, change] of Object.entries(changes)) {
-    if (key === 'conversionHistory' || change.newValue === undefined) continue;
-    updated[key] = change.newValue;
-  }
-  return updated;
+if (API.storage?.onChanged) {
+  API.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.enabled) updateBadge(changes.enabled.newValue !== false);
+  });
 }
 
-// FIX #6: Build config from the relevant changes instead of re-reading storage.
-async function broadcast(updated) {
-  configCache = FTM.configUtils.defaults(FTM.configUtils.merge(configCache || {}, updated));
-  const config = configCache;
-  const patterns = FTM.registrar.matches(config);
-  const query = patterns.includes('<all_urls>') ? {} : { url: patterns.slice(0, FTM.CONSTANTS.MAX_MATCH_PATTERNS) };
-  let tabs;
-  try { tabs = await chrome.tabs.query(query); } catch (_) { tabs = []; }
-  // Cap broadcast to avoid flooding hundreds of tabs with config updates.
-  const limit = FTM.CONSTANTS.MAX_BROADCAST_TABS || 100;
-  for (let i = 0; i < Math.min(tabs.length, limit); i++) {
-    if (!tabs[i].id) continue;
-    chrome.tabs.sendMessage(tabs[i].id, { type: FTM.MSG.CONFIG_UPDATE, config: updated }).catch(() => {});
-  }
-}
-
-function queueBroadcast(updated) {
-  Object.assign(pendingBroadcast, updated);
-  if (broadcastTimer) return;
-  broadcastTimer = setTimeout(() => {
-    const patch = pendingBroadcast;
-    pendingBroadcast = {};
-    broadcastTimer = null;
-    broadcast(patch);
-  }, 0);
-}
-
-function updateBadge(enabled) {
-  try {
-    chrome.action.setBadgeText({ text: enabled ? '' : 'OFF' });
-    chrome.action.setBadgeBackgroundColor({ color: enabled ? '#22c55e' : '#9ca3af' });
-    chrome.action.setTitle({ title: enabled ? 'FTM Studio — Active' : 'FTM Studio — Disabled' });
-  } catch (_) { /* action API may not be available */ }
-}
-
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local') return;
-  if ('enabled' in changes) updateBadge(changes.enabled.newValue !== false);
-  const updated = relevantChanges(changes);
-  if (Object.keys(updated).length === 0) return;
-  queueBroadcast(updated);
-  if (REGISTRATION_KEYS.some((key) => key in updated)) {
-    configCache = FTM.configUtils.defaults(FTM.configUtils.merge(configCache || {}, updated));
-    serializedSync(configCache);
-  }
-});
-
-// Set initial badge on install/startup.
-chrome.storage.local.get('enabled', (result) => {
-  if (chrome.runtime.lastError) {
-    updateBadge(true);
-    return;
-  }
-  updateBadge(result.enabled !== false);
-});
+ensureConfig().then((config) => updateBadge(config.enabled !== false)).catch(() => {});

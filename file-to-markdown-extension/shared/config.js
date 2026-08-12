@@ -69,19 +69,26 @@
     sanitizeRules(rules) {
       if (!Array.isArray(rules)) return [];
       return rules
-        .filter((r) => r && typeof r.pattern === 'string' && r.pattern)
+        .slice(0, 64)
+        .filter((r) => r && typeof r.pattern === 'string' && r.pattern.length > 0 && r.pattern.length <= 512)
         .map((r) => ({
           pattern: r.pattern,
-          replacement: typeof r.replacement === 'string' ? r.replacement : '',
-          flags: (r.flags || 'g').replace(/[^gimsuy]/g, '') || 'g',
+          replacement: typeof r.replacement === 'string' ? r.replacement.slice(0, 2048) : '',
+          flags: (r.flags || 'g').replace(/[^gimsuy]/g, '').slice(0, 8) || 'g',
           enabled: r.enabled !== false,
-          name: typeof r.name === 'string' ? r.name : ''
+          name: typeof r.name === 'string' ? r.name.slice(0, 80) : ''
         }));
     },
 
     domainList(list) {
       if (!Array.isArray(list)) return [];
-      return list.map((d) => String(d).trim().toLowerCase()).filter(Boolean);
+      return list.slice(0, FTM.CONSTANTS.MAX_MATCH_PATTERNS).map((value) => {
+        const raw = String(value).trim().toLowerCase();
+        return raw.replace('https://', '').replace('http://', '').split('/')[0];
+      }).filter((domain) => {
+        if (domain.length < 3 || domain.length > 253 || domain.startsWith('.') || domain.endsWith('.')) return false;
+        return domain.split('.').every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label));
+      });
     },
 
     // FIX Perf: Returns a Set (not an array) for O(1) lookups.

@@ -24,7 +24,8 @@
     return validType(message, FTM.MSG.CHUNK) && validSession(message) && typeof data.base64 === 'string'
       && data.base64.length > 0 && data.base64.length <= Math.ceil(FTM.CONSTANTS.TRANSFER_CHUNK_BYTES * 4 / 3) + 16
       && /^[A-Za-z0-9+/]*={0,2}$/.test(data.base64)
-      && Number.isInteger(data.index) && data.index >= 1;
+      && Number.isInteger(data.index) && data.index >= 1
+      && data.index <= Math.ceil(FTM.CONSTANTS.MAX_FILE_SIZE_BYTES / FTM.CONSTANTS.TRANSFER_CHUNK_BYTES);
   };
   const validEnd = (message) => validType(message, FTM.MSG.END) && validSession(message);
   const validCancel = (message) => validType(message, FTM.MSG.CANCEL) && validSession(message);
@@ -37,9 +38,12 @@
     && typeof message.data.phase === 'string' && /^[a-z][a-z-]{1,63}$/.test(message.data.phase)
     && (message.data.percent === undefined || (Number.isInteger(message.data.percent) && message.data.percent >= 0 && message.data.percent <= 100));
   const validResult = (message) => validType(message, FTM.MSG.RESULT) && validSession(message)
-    && typeof message.data.markdown === 'string' && message.data.markdown.length <= FTM.CONSTANTS.MAX_FILE_SIZE_BYTES * 4;
+    && typeof message.data.markdown === 'string' && message.data.markdown.length <= FTM.CONSTANTS.MAX_OUTPUT_BYTES;
   FTM.messages = {
-    isTrustedPort(port) { return !!(port && port.sender && port.sender.id === chrome.runtime.id); },
+    isTrustedPort(port) {
+      const runtimeId = self.FTM_BROWSER?.runtime?.id;
+      return !!(port && port.sender && runtimeId && port.sender.id === runtimeId);
+    },
     validSessionId,
     fromContent(message) { return validBegin(message) || validChunk(message) || validEnd(message) || validCancel(message) || validError(message); },
     fromOffscreen(message) {

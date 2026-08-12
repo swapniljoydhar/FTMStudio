@@ -23,7 +23,7 @@
     inject(src) {
       return new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = chrome.runtime.getURL(src);
+        script.src = self.FTM_BROWSER.getURL(src);
         const fail = (message) => { script.remove(); reject(new Error(message)); };
         const timeout = setTimeout(() => fail('Load timeout: ' + src), FTM.CONSTANTS.SCRIPT_LOAD_TIMEOUT_MS);
         script.onload = () => { clearTimeout(timeout); resolve(); };
@@ -54,8 +54,8 @@
     // getDocument() time (see offscreen/documents.js) to close CVE-2024-4367.
     async pdf() {
       if (this.loaded.has('pdf')) return this.loaded.get('pdf');
-      const lib = await import(chrome.runtime.getURL('lib/pdf.min.mjs'));
-      lib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.min.mjs');
+      const lib = await import(self.FTM_BROWSER.getURL('lib/pdf.min.mjs'));
+      lib.GlobalWorkerOptions.workerSrc = self.FTM_BROWSER.getURL('lib/pdf.worker.min.mjs');
       this.loaded.set('pdf', lib);
       return lib;
     },
@@ -80,8 +80,8 @@
       const Tesseract = self.Tesseract;
       if (!Tesseract) throw new Error('Tesseract.js did not initialise');
       const worker = await Tesseract.createWorker('eng', 1, {
-        workerPath: chrome.runtime.getURL('lib/tesseract/worker.min.js'),
-        langPath: chrome.runtime.getURL('lib/tesseract/langs'),
+        workerPath: self.FTM_BROWSER.getURL('lib/tesseract/worker.min.js'),
+        langPath: self.FTM_BROWSER.getURL('lib/tesseract/langs'),
         workerBlobURL: false,
         gzip: true
       });

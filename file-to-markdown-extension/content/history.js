@@ -13,6 +13,10 @@
 
   // 30 days in milliseconds.
   const EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
+  const storage = self.FTM_BROWSER?.storage || {
+    get: (key) => self.chrome.storage.local.get(key),
+    set: (value) => self.chrome.storage.local.set(value)
+  };
 
   FTM.history = {
     pending: [],
@@ -63,11 +67,11 @@
       // Serialize writes to prevent race conditions between concurrent tabs.
       this._persistMutex = this._persistMutex.then(async () => {
         try {
-          const stored = await chrome.storage.local.get('conversionHistory');
+          const stored = await storage.get('conversionHistory');
           let merged = FTM.text.mergeHistory(stored && stored.conversionHistory, batch, this.max());
           // Auto-expire old entries.
           merged = this.expireOld(merged);
-          await chrome.storage.local.set({ conversionHistory: merged });
+          await storage.set({ conversionHistory: merged });
         } catch (_) {
           this.pending = batch.concat(this.pending);
         }

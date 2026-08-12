@@ -12,7 +12,14 @@
     SNIFF_BYTES: 1024,
     MAX_TEXT_READ_SIZE_BYTES: 10 * 1024 * 1024,
     MAX_FILE_SIZE_BYTES: 50 * 1024 * 1024,
-    MAX_IMAGE_SIZE_BYTES: 10 * 1024 * 1024,
+    MAX_OUTPUT_BYTES: 80 * 1024 * 1024,
+    MAX_IMAGE_SIZE_BYTES: 4 * 1024 * 1024,
+    MAX_PDF_PAGES: 500,
+    MAX_OCR_PAGES: 12,
+    MAX_SPREADSHEET_CELLS: 500000,
+    MAX_ZIP_ENTRIES: 10000,
+    MAX_ZIP_UNCOMPRESSED_BYTES: 200 * 1024 * 1024,
+    MAX_QUEUE_FILES: 12,
     MAX_NULL_BYTES: 3,
     CSV_STREAM_THRESHOLD_MB_DEFAULT: 5,
     MAX_CSV_ROWS: 100000,
@@ -41,12 +48,21 @@
     '.pdf': 'pdf',
     '.csv': 'spreadsheets', '.xlsx': 'spreadsheets', '.xls': 'spreadsheets',
     '.py': 'code', '.js': 'code', '.cpp': 'code', '.css': 'code', '.json': 'code', '.xml': 'code',
-    '.html': 'markup', '.epub': 'markup', '.svg': 'markup',
+    '.html': 'markup',
+    '.epub': 'markup',
     '.pptx': 'presentations',
-    '.png': 'images', '.jpg': 'images', '.jpeg': 'images', '.gif': 'images', '.webp': 'images'
+    '.svg': 'markup'
   };
 
-  FTM.CATEGORIES = ['documents', 'pdf', 'spreadsheets', 'code', 'markup', 'presentations', 'images'];
+  // Manual mode intentionally exposes only formats with predictable local
+  // conversion quality. Images are not treated as documents by default because
+  // embedding base64 into Markdown multiplies memory and output size.
+  FTM.MANUAL_EXTENSIONS = new Set([
+    '.pdf', '.docx', '.txt', '.md', '.rtf', '.html', '.csv', '.xlsx', '.xls',
+    '.py', '.js', '.cpp', '.css', '.json', '.xml'
+  ]);
+
+  FTM.CATEGORIES = ['documents', 'pdf', 'spreadsheets', 'code', 'markup', 'presentations'];
 
   FTM.TEXT_EXTENSIONS = new Set(['.txt', '.md', '.py', '.js', '.cpp', '.css', '.json', '.xml', '.html', '.svg']);
   FTM.BINARY_EXTENSIONS = new Set(['.docx', '.xlsx', '.xls', '.epub', '.pptx', '.pdf']);

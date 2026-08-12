@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>FTM Studio — Convert files</title>
+  <link rel="stylesheet" href="convert.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="popup.html" aria-label="Back to FTM Studio settings"><span class="brand-mark">#</span><span>FTM Studio</span></a>
+      <span class="privacy-note">Local only</span>
+    </header>
+
+    <section class="hero" aria-labelledby="page-title">
+      <p class="eyebrow">Manual conversion workspace</p>
+      <h1 id="page-title">Convert files to Markdown</h1>
+      <p class="lede">Choose files here, convert them on this device, then download or drag the generated Markdown into your destination app yourself.</p>
+    </section>
+
+    <section class="dropzone" id="dropzone" tabindex="0" role="button" aria-controls="file-input" aria-describedby="drop-help">
+      <input id="file-input" type="file" multiple hidden>
+      <div class="drop-icon" aria-hidden="true">↑</div>
+      <h2>Drop files here</h2>
+      <p id="drop-help">or <button class="link-button" id="choose-button" type="button">choose files</button></p>
+      <p class="formats">PDF, DOCX, XLSX, CSV, TXT, Markdown, HTML, RTF, and source code</p>
+    </section>
+
+    <section class="limits" aria-label="Conversion limits">
+      <span>50 MB per file</span><span>One job at a time on mobile</span><span>No page access required</span>
+    </section>
+
+    <section class="queue-card" aria-labelledby="queue-title">
+      <div class="section-heading"><h2 id="queue-title">Queue</h2><button class="text-button" id="clear-button" type="button">Clear</button></div>
+      <div id="queue" class="queue" aria-live="polite"><p class="empty">No files selected yet.</p></div>
+    </section>
+
+    <section class="status" id="status" role="status" aria-live="polite">Ready for a local file.</section>
+    <p class="error" id="error" role="alert" hidden></p>
+
+    <footer class="footer"><span>Nothing is uploaded.</span><a href="README.md" target="_blank" rel="noopener noreferrer">Supported formats</a></footer>
+  </main>
+  <script src="shared/browser.js"></script>
+  <script src="shared/constants.js"></script>
+  <script src="shared/text.js"></script>
+  <script src="shared/config.js"></script>
+  <script src="offscreen/loader.js"></script>
+  <script src="offscreen/documents.js"></script>
+  <script src="offscreen/archives.js"></script>
+  <script src="offscreen/tabular.js"></script>
+  <script src="content/config.js"></script>
+  <script src="content/postprocess.js"></script>
+  <script src="content/converters.js"></script>
+  <script src="content/history.js"></script>
+  <script src="convert.js"></script>
+</body>
+</html>
