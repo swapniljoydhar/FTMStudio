@@ -177,3 +177,27 @@ test('parsePdf is registered', () => {
   const { FTM } = loadDocs();
   assert.equal(typeof FTM.parsers['.pdf'], 'function');
 });
+
+test('parseSpreadsheet rejects oversized sheets before materializing rows', async () => {
+  const { FTM } = loadDocs();
+  let materialized = false;
+  FTM.libs = {
+    get: async () => ({
+      read: () => ({ SheetNames: ['Oversized'], Sheets: { Oversized: { '!ref': 'A1:A500001' } } }),
+      utils: {
+        decode_range: () => ({ s: { r: 0, c: 0 }, e: { r: FTM.CONSTANTS.MAX_SPREADSHEET_CELLS, c: 0 } }),
+        sheet_to_json: () => {
+          materialized = true;
+          return [];
+        }
+      }
+    })
+  };
+
+  await assert.rejects(
+    FTM.parsers['.xlsx'](new Uint8Array([1]), { fileName: 'oversized.xlsx' }),
+    /Spreadsheet exceeds the safe cell limit/
+  );
+  assert.equal(materialized, false);
+});
+

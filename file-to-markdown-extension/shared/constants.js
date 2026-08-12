@@ -17,8 +17,6 @@
     MAX_PDF_PAGES: 500,
     MAX_OCR_PAGES: 12,
     MAX_SPREADSHEET_CELLS: 500000,
-    MAX_ZIP_ENTRIES: 10000,
-    MAX_ZIP_UNCOMPRESSED_BYTES: 200 * 1024 * 1024,
     MAX_QUEUE_FILES: 12,
     MAX_NULL_BYTES: 3,
     CSV_STREAM_THRESHOLD_MB_DEFAULT: 5,
@@ -49,8 +47,6 @@
     '.csv': 'spreadsheets', '.xlsx': 'spreadsheets', '.xls': 'spreadsheets',
     '.py': 'code', '.js': 'code', '.cpp': 'code', '.css': 'code', '.json': 'code', '.xml': 'code',
     '.html': 'markup',
-    '.epub': 'markup',
-    '.pptx': 'presentations',
     '.svg': 'markup'
   };
 
@@ -65,7 +61,7 @@
   FTM.CATEGORIES = ['documents', 'pdf', 'spreadsheets', 'code', 'markup', 'presentations'];
 
   FTM.TEXT_EXTENSIONS = new Set(['.txt', '.md', '.py', '.js', '.cpp', '.css', '.json', '.xml', '.html', '.svg']);
-  FTM.BINARY_EXTENSIONS = new Set(['.docx', '.xlsx', '.xls', '.epub', '.pptx', '.pdf']);
+  FTM.BINARY_EXTENSIONS = new Set(['.docx', '.xlsx', '.xls', '.pdf']);
   FTM.RTF_EXTENSION = new Set(['.rtf']);
   FTM.IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);
 
@@ -81,20 +77,6 @@
     { bytes: [0x1F, 0x8B], name: 'GZIP' },
     { bytes: [0x42, 0x5A, 0x68], name: 'BZIP2' }
   ];
-
-  FTM.PORT = { CONTENT: 'ftm', OFFSCREEN: 'ftm-offscreen-internal' };
-
-  FTM.MSG = {
-    BEGIN: 'BEGIN',
-    CHUNK: 'CHUNK',
-    ACK: 'CHUNK_ACK',
-    END: 'END',
-    RESULT: 'PROCESS_RESULT',
-    ERROR: 'ERROR',
-    PROGRESS: 'PROGRESS',
-    CANCEL: 'CANCEL',
-    CONFIG_UPDATE: 'CONFIG_UPDATE'
-  };
 
   FTM.AI_HOSTS = [
     'chat.openai.com', 'chatgpt.com', 'platform.openai.com', 'claude.ai', 'claude.com', 'console.anthropic.com', 'chat.qwen.ai', 'qwen.ai',

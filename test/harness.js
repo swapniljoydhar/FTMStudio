@@ -44,20 +44,15 @@ class StorageArea {
 
 function chromeStub(storage) {
   const registered = [];
-  const messages = [];
   return {
     registered,
-    messages,
     storage: { local: storage, onChanged: { addListener: (fn) => storage.listeners.push(fn) } },
     runtime: {
       getURL: (p) => 'chrome-extension://ftm/' + p,
       getManifest: () => ({ version: '3.0.0' }),
-      onMessage: { addListener: () => {} },
       onInstalled: { addListener: () => {} },
       onStartup: { addListener: () => {} },
       onSuspend: { addListener: () => {} },
-      onConnect: { addListener: (fn) => { registered.push(fn); } },
-      connect: () => ({ postMessage: (m) => messages.push(m), disconnect: () => {}, onMessage: { addListener: () => {} }, onDisconnect: { addListener: () => {} } })
     },
     scripting: {
       registerContentScripts: async (specs) => { registered.push(...specs); },
@@ -153,8 +148,4 @@ function loadContent(options) {
   return load([...SHARED, 'content/config.js', 'content/postprocess.js', 'content/converters.js', 'content/history.js'], options);
 }
 
-function loadArchives(options) {
-  return loadWithDOMParser([...SHARED, 'offscreen/archives.js'], options);
-}
-
-module.exports = { load, loadShared, loadContent, loadArchives, loadWithDOMParser, SHARED, ROOT };
+module.exports = { load, loadShared, loadContent, loadWithDOMParser, SHARED, ROOT };

@@ -71,12 +71,25 @@
     return heading + T.markdownTable(body, '', (v) => T.sanitizeAndEscapeCell(v)).replace(/^\n\n/, '') + '\n\n';
   }
 
+  function worksheetCellCount(XLSX, worksheet) {
+    const ref = worksheet && worksheet['!ref'];
+    if (!ref || !XLSX.utils.decode_range) return 0;
+    const range = XLSX.utils.decode_range(ref);
+    return (range.e.r - range.s.r + 1) * (range.e.c - range.s.c + 1);
+  }
+
   async function parseSpreadsheet(bytes, meta) {
     const XLSX = await FTM.libs.get('xlsx');
     const workbook = XLSX.read(bytes, { type: 'array' });
     const parts = ['# ' + T.plain(T.stem(meta.fileName)) + '\n\n'];
+    let cellCount = 0;
     for (const sheetName of workbook.SheetNames) {
-      const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '', blankrows: false });
+      const worksheet = workbook.Sheets[sheetName];
+      cellCount += worksheetCellCount(XLSX, worksheet);
+      if (cellCount > FTM.CONSTANTS.MAX_SPREADSHEET_CELLS) {
+        throw new Error('Spreadsheet exceeds the safe cell limit of ' + FTM.CONSTANTS.MAX_SPREADSHEET_CELLS + '.');
+      }
+      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', blankrows: false });
       if (rows && rows.length) parts.push(sheetToMarkdown(rows, sheetName, workbook.SheetNames.length > 1));
     }
     return parts.join('');
@@ -247,6 +260,11 @@
     } catch (_) { parts.push('*[Page ' + pageNum + ' could not be extracted]*\n\n'); }
   }
 
+  function assertOutputBudget(parts) {
+    const size = parts.reduce((total, part) => total + part.length, 0);
+    if (size > FTM.CONSTANTS.MAX_OUTPUT_BYTES) throw new Error('Output exceeded the safe Markdown limit.');
+  }
+
   // Process PDF pages with controlled concurrency to avoid blocking.
   async function processPdfPages(pdf, parts, batchSize = 4) {
     for (let i = 1; i <= pdf.numPages; i += batchSize) {
@@ -257,6 +275,7 @@
         batch.push(pdfPage(pdf, p, parts));
       }
       await Promise.all(batch);
+      assertOutputBudget(parts);
       if (end % (batchSize * 2) === 0) await new Promise((r) => setTimeout(r, 0));
     }
   }
@@ -363,39 +382,43 @@
 
   async function parseScannedPdf(pdf, title) {
     const parts = [title, '*[Scanned PDF — OCR applied]*\n\n'];
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const pagesToProcess = Math.min(pdf.numPages, FTM.CONSTANTS.MAX_OCR_PAGES);
+    for (let pageNum = 1; pageNum <= pagesToProcess; pageNum++) {
       if (pdf.numPages > 1) parts.push('\n---\n\n**Page ' + pageNum + '**\n\n');
       try {
         const text = await ocrPage(pdf, pageNum);
         if (!text) parts.push('*[No text detected on this page]*\n\n');
         else for (const line of text.split('\n').filter((l) => l.trim())) parts.push(isHeadingLine(line) ? '## ' + line + '\n\n' : line + '\n\n');
       } catch (_) { parts.push('*[OCR failed for page ' + pageNum + ']*\n\n'); }
+      assertOutputBudget(parts);
       if (pageNum % 3 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    if (pagesToProcess < pdf.numPages) {
+      parts.push('\n*[OCR limited to ' + FTM.CONSTANTS.MAX_OCR_PAGES + ' pages.]*\n\n');
     }
     return parts;
   }
 
   async function parsePdf(bytes, meta) {
     const pdf = await openPdf(bytes);
-
-    const title = '# ' + T.plain(T.stem(meta.fileName)) + '\n\n';
-    const pageInfo = '*' + pdf.numPages + ' page' + (pdf.numPages !== 1 ? 's' : '') + ' extracted*\n\n';
-
-    // First pass: try PDF.js text extraction.
-    const extractedText = await extractTextSample(pdf);
-
-    // If very little text was extracted, this is likely a scanned PDF.
-    if (extractedText.length < OCR_THRESHOLD) {
-      const parts = await parseScannedPdf(pdf, title);
+    if (pdf.numPages > FTM.CONSTANTS.MAX_PDF_PAGES) {
       await pdf.destroy();
-      return dedupPageHeaders(parts.join('').replace(/\n{3,}/g, '\n\n').trim(), pdf.numPages);
+      throw new Error('PDF exceeds the safe page limit of ' + FTM.CONSTANTS.MAX_PDF_PAGES + '.');
     }
-
-    // Normal path: layout-aware text extraction with parallel page processing.
-    const parts = [title, pageInfo];
-    await processPdfPages(pdf, parts);
-    await pdf.destroy();
-    return dedupPageHeaders(parts.join('').replace(/\n{3,}/g, '\n\n').trim(), pdf.numPages);
+    try {
+      const title = '# ' + T.plain(T.stem(meta.fileName)) + '\n\n';
+      const pageInfo = '*' + pdf.numPages + ' page' + (pdf.numPages !== 1 ? 's' : '') + ' extracted*\n\n';
+      const extractedText = await extractTextSample(pdf);
+      if (extractedText.length < OCR_THRESHOLD) {
+        const parts = await parseScannedPdf(pdf, title);
+        return dedupPageHeaders(parts.join('').replace(/\n{3,}/g, '\n\n').trim(), pdf.numPages);
+      }
+      const parts = [title, pageInfo];
+      await processPdfPages(pdf, parts);
+      return dedupPageHeaders(parts.join('').replace(/\n{3,}/g, '\n\n').trim(), pdf.numPages);
+    } finally {
+      try { await pdf.destroy(); } finally { FTM.libs.releaseTesseract?.(); }
+    }
   }
 
   // ── Expose internals for testing ────────────────────────────────────

@@ -5,13 +5,13 @@
   "license": "Apache-2.0",
   "description": "FTM Studio — privacy-first local file-to-Markdown WebExtension",
   "scripts": {
-    "test": "node --test test/config.test.js test/documents.test.js test/history.test.js test/pipeline.test.js test/postprocess.test.js test/sources.test.js test/text.test.js test/converters.test.js test/messages.test.js test/archives.test.js",
+    "test": "node --test test/config.test.js test/documents.test.js test/history.test.js test/pipeline.test.js test/postprocess.test.js test/sources.test.js test/text.test.js test/converters.test.js",
     "build": "node scripts/verify-extension.mjs",
     "lint": "eslint .",
     "verify:libs": "node scripts/verify-libs.mjs"
   },
   "devDependencies": {
-    "eslint": "^10.8.0"
+    "eslint": "^10.8.1"
   },
   "engines": { "node": ">=20" }
 }

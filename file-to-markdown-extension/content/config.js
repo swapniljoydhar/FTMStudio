@@ -12,7 +12,6 @@
   FTM.applyConfig = function applyConfig(patch) {
     const pipelineChanged = !!(patch && 'regexPipeline' in patch);
     FTM.config = FTM.configUtils.merge(FTM.config, patch || {});
-    if (FTM.activation) FTM.activation.invalidate();
     if (pipelineChanged && FTM.postprocess) FTM.postprocess.clearCache();
     return FTM.config;
   };
@@ -22,11 +21,4 @@
     return FTM.applyConfig(await FTM_BROWSER.storage.get(null));
   };
 
-  const runtime = self.FTM_BROWSER?.runtime;
-  if (runtime?.onMessage) {
-    runtime.onMessage.addListener((message, sender) => {
-      if (!FTM.messages?.isTrustedPort({ sender })) return;
-      if (message && message.type === FTM.MSG.CONFIG_UPDATE && message.config) FTM.applyConfig(message.config);
-    });
-  }
 })();

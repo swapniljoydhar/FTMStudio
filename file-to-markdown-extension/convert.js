@@ -24,7 +24,11 @@
   }
   function formatBytes(bytes) { return FTM.text.formatBytes(bytes); }
   function supported(file) { return FTM.MANUAL_EXTENSIONS.has(extensionOf(file.name)) && file.size <= FTM.CONSTANTS.MAX_FILE_SIZE_BYTES; }
-  function parserMeta(file, ext) { return { fileName: file.name, imageMode: FTM.config.imageMode, extension: ext }; }
+  function parserMeta(file, ext) {
+    const threshold = Number(FTM.config.csvStreamThreshold) || FTM.CONSTANTS.CSV_STREAM_THRESHOLD_MB_DEFAULT;
+    return { fileName: file.name, imageMode: FTM.config.imageMode, extension: ext,
+      streaming: ext === '.csv' && file.size >= threshold * FTM.CONSTANTS.MB };
+  }
 
   async function convertFile(file, ext) {
     if (FTM.OFFSCREEN_EXTENSIONS.has(ext)) {
@@ -57,36 +61,51 @@
     return button;
   }
 
+  const rowById = new Map();
+
+  function createJobRow() {
+    const row = document.createElement('article'); row.className = 'job';
+    const main = document.createElement('div'); main.className = 'job-main';
+    const name = document.createElement('p'); name.className = 'job-name'; main.appendChild(name);
+    const meta = document.createElement('p'); meta.className = 'job-meta'; main.appendChild(meta);
+    const state = document.createElement('p'); state.className = 'job-state'; main.appendChild(state);
+    const actions = document.createElement('div'); actions.className = 'job-actions';
+    row.append(main, actions);
+    return { row, name, meta, state, actions };
+  }
+
+  function updateJobRow(elements, job) {
+    elements.name.textContent = job.file.name;
+    elements.meta.textContent = formatBytes(job.file.size) + ' · ' + extensionOf(job.file.name);
+    elements.state.textContent = statusLabel(job);
+    const actions = elements.actions; actions.replaceChildren();
+    if (job.url) {
+      const download = document.createElement('a'); download.className = 'download'; download.href = job.url; download.download = job.outputName; download.draggable = true; text(download, 'Download / drag');
+      download.addEventListener('dragstart', (event) => {
+        if (!event.dataTransfer) return;
+        event.dataTransfer.effectAllowed = 'copy';
+        event.dataTransfer.setData('DownloadURL', 'text/markdown:' + job.outputName + ':' + job.url);
+        event.dataTransfer.setData('text/uri-list', job.url);
+        event.dataTransfer.setData('text/plain', job.outputName);
+      });
+      actions.appendChild(download);
+    } else if (job.running) actions.appendChild(makeButton('Cancel', 'cancel', () => cancelJob(job)));
+    else actions.appendChild(makeButton('Remove', 'cancel', () => removeJob(job)));
+  }
+
   function render() {
-    while (queueNode.firstChild) queueNode.removeChild(queueNode.firstChild);
     if (!jobs.length) {
-      const empty = document.createElement('p'); empty.className = 'empty'; text(empty, 'No files selected yet.'); queueNode.appendChild(empty); return;
+      rowById.clear();
+      const empty = document.createElement('p'); empty.className = 'empty'; text(empty, 'No files selected yet.'); queueNode.replaceChildren(empty); return;
     }
+    const fragment = document.createDocumentFragment();
+    const activeIds = new Set();
     for (const job of jobs) {
-      const row = document.createElement('article'); row.className = 'job'; row.dataset.id = job.id;
-      const main = document.createElement('div'); main.className = 'job-main';
-      const name = document.createElement('p'); name.className = 'job-name'; text(name, job.file.name); main.appendChild(name);
-      const meta = document.createElement('p'); meta.className = 'job-meta'; text(meta, formatBytes(job.file.size) + ' · ' + extensionOf(job.file.name)); main.appendChild(meta);
-      const state = document.createElement('p'); state.className = 'job-state'; text(state, statusLabel(job)); main.appendChild(state);
-      row.appendChild(main);
-      const actions = document.createElement('div'); actions.className = 'job-actions';
-      if (job.url) {
-        const download = document.createElement('a'); download.className = 'download'; download.href = job.url; download.download = job.outputName; download.draggable = true; text(download, 'Download / drag');
-        download.addEventListener('dragstart', (event) => {
-          if (!event.dataTransfer) return;
-          event.dataTransfer.effectAllowed = 'copy';
-          event.dataTransfer.setData('DownloadURL', 'text/markdown:' + job.outputName + ':' + job.url);
-          event.dataTransfer.setData('text/uri-list', job.url);
-          event.dataTransfer.setData('text/plain', job.outputName);
-        });
-        actions.appendChild(download);
-      } else if (job.running) {
-        actions.appendChild(makeButton('Cancel', 'cancel', () => cancelJob(job)));
-      } else {
-        actions.appendChild(makeButton('Remove', 'cancel', () => removeJob(job)));
-      }
-      row.appendChild(actions); queueNode.appendChild(row);
+      const elements = rowById.get(job.id) || createJobRow();
+      rowById.set(job.id, elements); activeIds.add(job.id); updateJobRow(elements, job); fragment.appendChild(elements.row);
     }
+    for (const id of rowById.keys()) if (!activeIds.has(id)) rowById.delete(id);
+    queueNode.replaceChildren(fragment);
   }
 
   function removeJob(job) {
@@ -130,7 +149,7 @@
       if (markdown.length > FTM.CONSTANTS.MAX_OUTPUT_BYTES) throw new Error('Output exceeded the safe Markdown limit.');
       job.url = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }));
       job.running = false; job.outputName = FTM.text.stem(job.file.name) + '.md';
-      FTM.history.record(job.file.name, job.file.size, ext, markdown.length); await FTM.history.flush();
+      FTM.history.record(job.file.name, job.file.size, ext, markdown.length);
       setStatus('Ready: ' + job.outputName + '. Download it or drag the result handle into a destination that accepts file drops.');
     } catch (error) {
       job.running = false; job.error = error && error.message ? error.message : 'Conversion failed.';
@@ -145,7 +164,10 @@
         if (job.url || job.error || job.cancelled) continue;
         await convertJob(job);
       }
-    } finally { running = false; }
+    } finally {
+      running = false;
+      await FTM.history.flush();
+    }
   }
 
   $('choose-button').addEventListener('click', () => fileInput.click());

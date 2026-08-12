@@ -30,7 +30,7 @@ async function updateBadge(enabled) {
   } catch (_) { /* Badge APIs vary by browser and are non-essential. */ }
 }
 
-API.runtime.onInstalled.addListener((details) => ensureConfig().then((config) => updateBadge(config.enabled !== false)).catch(() => {}));
+API.runtime.onInstalled.addListener(() => ensureConfig().then((config) => updateBadge(config.enabled !== false)).catch(() => {}));
 API.runtime.onStartup.addListener(() => ensureConfig().then((config) => updateBadge(config.enabled !== false)).catch(() => {}));
 
 if (API.storage?.onChanged) {

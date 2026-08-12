@@ -43,8 +43,6 @@
     runtime: api.runtime,
     storage,
     getURL(path) { return api.runtime.getURL(path); },
-    sendMessage(message) { return call(api.runtime.sendMessage, api.runtime, [message]); },
-    connect(info) { return api.runtime.connect(info); },
     hasOffscreen: !!api.offscreen,
     hasScripting: !!api.scripting,
     hasDownloads: !!api.downloads,
