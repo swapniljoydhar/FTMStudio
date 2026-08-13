@@ -3,7 +3,7 @@
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
 [![Privacy First](https://img.shields.io/badge/Privacy-100%25%20Local-green)](#privacy-model)
 [![Version](https://img.shields.io/badge/version-4.0.0-orange)](file-to-markdown-extension/manifest.json)
-[![Tests](https://img.shields.io/badge/tests-81%20passing-brightgreen)](#testing)
+[![Tests](https://img.shields.io/badge/tests-84%20passing-brightgreen)](#testing)
 
 A **privacy-first**, **local-first** browser extension that converts user-selected files into structured Markdown before you attach them anywhere. FTM Studio does not inject into websites, modify third-party upload controls, request access to arbitrary pages, or send document contents to a server.
 
@@ -148,12 +148,12 @@ No extension can honestly guarantee zero latency, zero RAM growth, or zero quali
 
 ## Configuration
 
-The popup exposes settings for the local conversion workflow, including the master state, Markdown output behavior, frontmatter preference, image/parser policy where applicable, supported-format policy, and privacy-preserving history controls.
+The popup exposes settings for the local conversion workflow, including the master state, Markdown output behavior, frontmatter preference, heading and whitespace normalization, category-level format policy, and privacy-preserving history controls.
 
 | Control area | Purpose |
 |---|---|
 | **General** | Enable or disable the extension and manage core output behavior. |
-| **Formats** | Keep only the supported conversion categories needed for the user’s workflow. |
+| **Formats** | Enable or disable complete conversion categories before files enter the queue. |
 | **Output** | Configure post-processing and optional frontmatter behavior. |
 | **History** | Review redacted local conversion metadata or clear it. |
 
@@ -194,12 +194,12 @@ The popup exposes settings for the local conversion workflow, including the mast
 
 ```bash
 npm install
-npm test              # 81 tests against the current sources
+npm test              # 84 tests against the current sources
 npm run build         # MV3 manifest and source-reference verification
 npm run verify:libs   # SHA-256 verification of pinned parser libraries
 ```
 
-The current validation baseline is **81 passing tests**, MV3 verification of **22 extension files**, and SHA-256 verification of **10 pinned libraries**. These checks do not replace browser-matrix testing, malformed-document fuzzing, or parser-specific memory testing.
+The current validation baseline is **84 passing tests**, MV3 verification of **22 extension files**, and SHA-256 verification of **10 pinned libraries**. These checks do not replace browser-matrix testing, malformed-document fuzzing, or parser-specific memory testing.
 
 ### Project Structure
 

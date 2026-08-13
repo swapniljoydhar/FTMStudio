@@ -27,6 +27,16 @@ test('merge deep-merges categories without dropping unspecified ones', () => {
   assert.equal(config.categories.documents, true);
 });
 
+test('format policy honors the master switch and category settings', () => {
+  const { FTM } = loadShared();
+  const enabled = FTM.configUtils.defaults({});
+  assert.equal(FTM.configUtils.isFormatEnabled(enabled, '.txt'), true);
+  assert.equal(FTM.configUtils.isFormatEnabled({ ...enabled, enabled: false }, '.txt'), false);
+  assert.equal(FTM.configUtils.isFormatEnabled({ ...enabled, categories: { ...enabled.categories, documents: false } }, '.txt'), false);
+  assert.equal(FTM.configUtils.isFormatEnabled({ ...enabled, categories: { ...enabled.categories, code: false } }, '.js'), false);
+  assert.equal(FTM.configUtils.isFormatEnabled({ ...enabled, categories: { ...enabled.categories, code: false } }, '.pdf'), true);
+});
+
 test('sanitizeRules bounds patterns, replacements, flags, and rule count', () => {
   const { FTM } = loadShared();
   const rules = FTM.configUtils.sanitizeRules([

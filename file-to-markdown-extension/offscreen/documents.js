@@ -250,14 +250,18 @@
     }
   }
 
-  async function pdfPage(pdf, pageNum, parts) {
+  async function pdfPage(pdf, pageNum) {
+    const pageParts = [];
     try {
       const content = await (await pdf.getPage(pageNum)).getTextContent();
       const lines = clusterLines(content);
-      if (!lines.length) { parts.push('*[Page ' + pageNum + ': no text content]*\n\n'); return; }
-      const boundaries = detectTableColumns(lines);
-      if (boundaries) renderPdfTable(lines, parts, boundaries); else renderPdfText(lines, parts);
-    } catch (_) { parts.push('*[Page ' + pageNum + ' could not be extracted]*\n\n'); }
+      if (!lines.length) pageParts.push('*[Page ' + pageNum + ': no text content]*\n\n');
+      else {
+        const boundaries = detectTableColumns(lines);
+        if (boundaries) renderPdfTable(lines, pageParts, boundaries); else renderPdfText(lines, pageParts);
+      }
+    } catch (_) { pageParts.push('*[Page ' + pageNum + ' could not be extracted]*\n\n'); }
+    return pageParts.join('');
   }
 
   function assertOutputBudget(parts) {
@@ -265,16 +269,19 @@
     if (size > FTM.CONSTANTS.MAX_OUTPUT_BYTES) throw new Error('Output exceeded the safe Markdown limit.');
   }
 
-  // Process PDF pages with controlled concurrency to avoid blocking.
+  // Process PDF pages with controlled concurrency to avoid blocking while
+  // appending completed page results in source order.
   async function processPdfPages(pdf, parts, batchSize = 4) {
     for (let i = 1; i <= pdf.numPages; i += batchSize) {
       const batch = [];
       const end = Math.min(i + batchSize, pdf.numPages + 1);
-      for (let p = i; p < end; p++) {
-        if (pdf.numPages > 1) parts.push('\n---\n\n**Page ' + p + '**\n\n');
-        batch.push(pdfPage(pdf, p, parts));
+      for (let p = i; p < end; p++) batch.push(pdfPage(pdf, p));
+      const pageResults = await Promise.all(batch);
+      for (let offset = 0; offset < pageResults.length; offset++) {
+        const pageNum = i + offset;
+        if (pdf.numPages > 1) parts.push('\n---\n\n**Page ' + pageNum + '**\n\n');
+        parts.push(pageResults[offset]);
       }
-      await Promise.all(batch);
       assertOutputBudget(parts);
       if (end % (batchSize * 2) === 0) await new Promise((r) => setTimeout(r, 0));
     }
@@ -424,6 +431,7 @@
   // ── Expose internals for testing ────────────────────────────────────
 
   FTM._pdfLayout = { clusterLines, detectTableColumns, lineToText, cellsToMarkdownTable };
+  FTM._pdfProcessing = { processPdfPages };
 
   // ── Register parsers ────────────────────────────────────────────────
 

@@ -43,11 +43,6 @@
     runtime: api.runtime,
     storage,
     getURL(path) { return api.runtime.getURL(path); },
-    hasOffscreen: !!api.offscreen,
-    hasScripting: !!api.scripting,
-    hasDownloads: !!api.downloads,
-    hasPermissions: !!api.permissions,
-    hasTabs: !!api.tabs,
     call
   };
 })();

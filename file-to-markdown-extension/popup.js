@@ -6,10 +6,12 @@
   const FTM = self.FTM;
   const API = self.FTM_BROWSER;
   const configKeys = ['enabled', 'yamlFrontmatter', 'stripTrailingWhitespace', 'enforceHeadingHierarchy'];
-  const formatLabels = {
-    '.pdf': 'PDF', '.docx': 'DOCX', '.txt': 'Text', '.md': 'Markdown', '.rtf': 'RTF', '.html': 'HTML',
-    '.csv': 'CSV', '.xlsx': 'XLSX', '.xls': 'Legacy XLS', '.py': 'Python', '.js': 'JavaScript',
-    '.cpp': 'C++', '.css': 'CSS', '.json': 'JSON', '.xml': 'XML'
+  const categoryLabels = {
+    documents: ['Documents', 'DOCX, TXT, MD, RTF'],
+    pdf: ['PDF', 'Page extraction with bounded OCR fallback'],
+    spreadsheets: ['Spreadsheets', 'CSV, XLSX, XLS'],
+    code: ['Source code', 'Python, JavaScript, C++, CSS, JSON, XML'],
+    markup: ['Markup', 'HTML documents']
   };
   let config = FTM.configUtils.defaults({});
   let saveTimer = null;
@@ -35,15 +37,12 @@
 
   function renderFormats() {
     const root = $('format-list'); root.replaceChildren();
-    for (const ext of FTM.MANUAL_EXTENSIONS) {
+    for (const [category, [labelText, detail]] of Object.entries(categoryLabels)) {
       const label = document.createElement('label'); label.className = 'format-item';
-      const input = document.createElement('input'); input.type = 'checkbox'; input.checked = config.categories[FTM.EXTENSION_MAP[ext]] !== false; input.disabled = false;
-      input.addEventListener('change', () => {
-        const category = FTM.EXTENSION_MAP[ext];
-        save({ categories: { [category]: input.checked } });
-      });
-      const name = document.createElement('span'); setText(name, formatLabels[ext] || ext.slice(1).toUpperCase());
-      const suffix = document.createElement('small'); setText(suffix, ext);
+      const input = document.createElement('input'); input.type = 'checkbox'; input.checked = config.categories[category] !== false;
+      input.addEventListener('change', () => save({ categories: { [category]: input.checked } }));
+      const name = document.createElement('span'); setText(name, labelText);
+      const suffix = document.createElement('small'); setText(suffix, detail);
       label.append(input, name, suffix); root.appendChild(label);
     }
   }

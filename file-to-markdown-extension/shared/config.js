@@ -1,10 +1,6 @@
 // ===========================================================================
 // shared/config.js — Default configuration + prototype-safe merge helpers
 // ===========================================================================
-// FIX Perf #2/#3: effectiveHosts() now returns a cached Set.
-//   matchesAny() and domainList() results are cached per config snapshot.
-//   domainList() accepts arrays and returns cached arrays.
-// ===========================================================================
 
 'use strict';
 
@@ -14,18 +10,11 @@
 
   FTM.DEFAULT_CONFIG = {
     enabled: true,
-    smartMode: true,
-    autoConvert: false,
-    autoDismissSeconds: FTM.CONSTANTS.TOAST_COUNTDOWN_DEFAULT_SEC,
-    domainBlacklist: [],
-    domainWhitelist: [],
-    customAiHosts: [],
     categories: {
       documents: true, pdf: true, spreadsheets: true, code: true,
       markup: true, presentations: true, images: true
     },
     yamlFrontmatter: true,
-    preserveOriginalMime: false,
     imageMode: 'embedded', // 'embedded' | 'placeholder' | 'external'
     csvStreamThreshold: FTM.CONSTANTS.CSV_STREAM_THRESHOLD_MB_DEFAULT,
     stripTrailingWhitespace: true,
@@ -57,13 +46,17 @@
         out.categories = this.assign({ ...(base.categories || {}) }, categories);
       }
       out.regexPipeline = this.sanitizeRules(out.regexPipeline);
-      // Always clear effectiveHosts cache on merge.
-      delete out._effectiveHostsCache;
       return out;
     },
 
     defaults(patch) {
       return this.merge(FTM.DEFAULT_CONFIG, patch);
+    },
+
+    isFormatEnabled(config, extension) {
+      if (config && config.enabled === false) return false;
+      const category = FTM.EXTENSION_MAP[extension];
+      return !category || !config || !config.categories || config.categories[category] !== false;
     },
 
     sanitizeRules(rules) {
@@ -91,24 +84,5 @@
       });
     },
 
-    // FIX Perf: Returns a Set (not an array) for O(1) lookups.
-    effectiveHosts(config) {
-      // Cache the Set per config snapshot to avoid repeated allocation.
-      if (config._effectiveHostsCache) return config._effectiveHostsCache;
-      const hosts = new Set([
-        ...FTM.AI_HOSTS.map((h) => h.toLowerCase()),
-        ...this.domainList(config.domainWhitelist)
-      ]);
-      for (const entry of config.customAiHosts || []) {
-        const raw = String(entry || '');
-        if (raw.length < 2) continue;
-        const domain = raw.substring(1).trim().toLowerCase();
-        if (!domain) continue;
-        if (raw[0] === '+') hosts.add(domain);
-        if (raw[0] === '-') hosts.delete(domain);
-      }
-      config._effectiveHostsCache = hosts;
-      return hosts;
-    }
   };
 })();

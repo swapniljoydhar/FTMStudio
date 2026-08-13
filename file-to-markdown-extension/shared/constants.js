@@ -78,35 +78,4 @@
     { bytes: [0x42, 0x5A, 0x68], name: 'BZIP2' }
   ];
 
-  FTM.AI_HOSTS = [
-    'chat.openai.com', 'chatgpt.com', 'platform.openai.com', 'claude.ai', 'claude.com', 'console.anthropic.com', 'chat.qwen.ai', 'qwen.ai',
-    'gemini.google.com', 'bard.google.com', 'aistudio.google.com', 'notebooklm.google.com', 'copilot.microsoft.com', 'bing.com', 'chat.deepseek.com',
-    'deepseek.com', 'chat.mistral.ai', 'mistral.ai', 'huggingface.co', 'hf.co', 'poe.com', 'perplexity.ai', 'labs.perplexity.ai',
-    'you.com', 'character.ai', 'meta.ai', 'llama.meta.com', 'cohere.com', 'dashboard.cohere.com', 'chatglm.cn', 'chat.zhipuai.cn',
-    'tongyi.aliyun.com', 'qianwen.aliyun.com', 'kimi.moonshot.cn', 'moonshot.cn', 'doubao.com', 'yiyan.baidu.com', 'cloud.baidu.com',
-    'iflytek.com', 'xinghuo.xfyun.cn', 'minimax.chat', 'minimaxi.com', '01.ai', 'wanmo.ai', 'abab.minimaxi.com', 'reka.ai',
-    'grok.com', 'x.ai', 'monica.im', 'felo.ai', 'genspark.ai', 'manus.im', 'chat.z.ai', 'z.ai', 'hailuoai.com',
-    'labs.google', 'pi.ai', 'inflection.ai', 'groq.com', 'together.ai', 'fireworks.ai', 'anyscale.com', 'replicate.com', 'openrouter.ai',
-    'jasper.ai', 'app.jasper.ai', 'copy.ai', 'writesonic.com', 'chatsonic.com', 'rytr.me', 'sudowrite.com', 'shortlyai.com',
-    'copysmith.ai', 'anyword.com', 'wordtune.com', 'compose.ai', 'hyperwriteai.com', 'moonbeam.ai', 'textcortex.com',
-    'peppertype.ai', 'simplified.com', 'scalenut.com', 'frase.io', 'surfer-seo.com', 'neuronwriter.com', 'growthbar-seo.com',
-    'outwrite.com', 'grammarly.com', 'prowritingaid.com', 'quillbot.com', 'undetectable.ai', 'gptzero.me', 'zerogpt.com', 'copyleaks.com',
-    'cursor.sh', 'cursor.com', 'replit.com', 'codeium.com', 'tabnine.com', 'codiga.io', 'sourcery.ai', 'deepcode.ai', 'askcodi.com',
-    'blackbox.ai', 'phind.com', 'devv.ai', 'codegeex.cn', 'seek.ai', 'mutable.ai',
-    'midjourney.com', 'stability.ai', 'dreamstudio.ai', 'leonardo.ai', 'ideogram.ai', 'playground.ai', 'craiyon.com', 'imagine.meta.com',
-    'firefly.adobe.com', 'canva.com', 'picsart.com', 'remove.bg', 'upscayl.org', 'lensa.ai', 'wombo.art', 'nightcafe.studio',
-    'artbreeder.com', 'getimg.ai', 'stablediffusionweb.com', 'clipdrop.co', 'dezgo.com', 'hotpot.ai', 'deepai.org',
-    'runwayml.com', 'runway.com', 'synthesia.io', 'pika.art', 'klingai.com', 'luma.ai', 'heygen.com', 'descript.com', 'kapwing.com',
-    'invideo.io', 'pictory.ai', 'elai.io', 'colossyan.com', 'hourone.ai', 'rephrase.ai', 'd-id.com', 'kaiber.ai', 'genmo.ai',
-    'elevenlabs.io', 'play.ht', 'murf.ai', 'resemble.ai', 'speechify.com', 'otter.ai', 'fireflies.ai', 'voicemod.net', 'uberduck.ai',
-    'suno.com', 'udio.com', 'aiva.ai', 'soundraw.io', 'mubert.com', 'boomy.com',
-    'consensus.app', 'elicit.com', 'scite.ai', 'semanticscholar.org', 'typeset.io', 'chatpdf.com', 'explainpaper.com',
-    'notion.so', 'notion.ai', 'gamma.app', 'tome.app', 'beautiful.ai', 'slidesai.io', 'taskade.com', 'mem.ai', 'read.ai',
-    'fathom.video', 'tldv.io', 'gong.io', 'chorus.ai', 'intercom.com', 'drift.com', 'zendesk.com', 'freshdesk.com', 'tidio.com',
-    'crisp.chat', 'liveperson.com', 'ada.cx', 'forethought.ai', 'databricks.com', 'h2o.ai', 'dataiku.com', 'alteryx.com',
-    'obviously.ai', 'monkeylearn.com', 'figma.com', 'uizard.io', 'galileo.ai', 'magician.design', 'whimsical.com', 'miro.com',
-    'duolingo.com', 'quizlet.com', 'photomath.com', 'gradescope.com', 'harvey.ai', 'alphasense.com', 'kensho.com', 'tempus.com',
-    'pathai.com', 'viz.ai', 'aidoc.com', 'benevolent.ai', 'recursionpharma.com', 'insitro.com',
-    'bolt.new', 'lovable.dev', 'v0.app'
-  ];
 })();

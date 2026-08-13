@@ -23,7 +23,11 @@
     return match ? '.' + match[1] : '';
   }
   function formatBytes(bytes) { return FTM.text.formatBytes(bytes); }
-  function supported(file) { return FTM.MANUAL_EXTENSIONS.has(extensionOf(file.name)) && file.size <= FTM.CONSTANTS.MAX_FILE_SIZE_BYTES; }
+  function supported(file) {
+    const ext = extensionOf(file.name);
+    return FTM.configUtils.isFormatEnabled(FTM.config, ext) &&
+      FTM.MANUAL_EXTENSIONS.has(ext) && file.size <= FTM.CONSTANTS.MAX_FILE_SIZE_BYTES;
+  }
   function parserMeta(file, ext) {
     const threshold = Number(FTM.config.csvStreamThreshold) || FTM.CONSTANTS.CSV_STREAM_THRESHOLD_MB_DEFAULT;
     return { fileName: file.name, imageMode: FTM.config.imageMode, extension: ext,

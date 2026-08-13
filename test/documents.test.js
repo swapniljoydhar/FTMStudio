@@ -178,6 +178,23 @@ test('parsePdf is registered', () => {
   assert.equal(typeof FTM.parsers['.pdf'], 'function');
 });
 
+test('PDF page assembly preserves source order when extraction resolves out of order', async () => {
+  const { FTM } = loadDocs();
+  const delays = { 1: 30, 2: 1, 3: 15 };
+  const pdf = {
+    numPages: 3,
+    getPage: async (pageNum) => {
+      await new Promise((resolve) => setTimeout(resolve, delays[pageNum]));
+      return { getTextContent: async () => ({ items: [{ str: 'Page ' + pageNum, width: 20, transform: [1, 0, 0, 1, 10, 100] }] }) };
+    }
+  };
+  const parts = [];
+  await FTM._pdfProcessing.processPdfPages(pdf, parts, 3);
+  const markdown = parts.join('');
+  assert.ok(markdown.indexOf('**Page 1**') < markdown.indexOf('**Page 2**'));
+  assert.ok(markdown.indexOf('**Page 2**') < markdown.indexOf('**Page 3**'));
+});
+
 test('parseSpreadsheet rejects oversized sheets before materializing rows', async () => {
   const { FTM } = loadDocs();
   let materialized = false;
